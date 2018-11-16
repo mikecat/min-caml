@@ -16,6 +16,7 @@ let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_
       Format.eprintf "uninstantiated type variable detected; assuming int@.";
       r := Some(Type.Int);
       Type.Int
+  | Type.List(t) -> Type.List(deref_typ t)
   | Type.Var({ contents = Some(t) } as r) ->
       let t' = deref_typ t in
       r := Some(t');
@@ -47,12 +48,13 @@ let rec deref_term = function
   | Array(e1, e2) -> Array(deref_term e1, deref_term e2)
   | Get(e1, e2) -> Get(deref_term e1, deref_term e2)
   | Put(e1, e2, e3) -> Put(deref_term e1, deref_term e2, deref_term e3)
+  | List(e) -> List(List.map deref_term e)
   | e -> e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
   | Type.Fun(t2s, t2) -> List.exists (occur r1) t2s || occur r1 t2
   | Type.Tuple(t2s) -> List.exists (occur r1) t2s
-  | Type.Array(t2) -> occur r1 t2
+  | Type.Array(t2) | Type.List(t2) -> occur r1 t2
   | Type.Var(r2) when r1 == r2 -> true
   | Type.Var({ contents = None }) -> false
   | Type.Var({ contents = Some(t2) }) -> occur r1 t2
@@ -68,7 +70,7 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)))
-  | Type.Array(t1), Type.Array(t2) -> unify t1 t2
+  | Type.Array(t1), Type.Array(t2) | Type.List(t1), Type.List(t2) -> unify t1 t2
   | Type.Var(r1), Type.Var(r2) when r1 == r2 -> ()
   | Type.Var({ contents = Some(t1') }), _ -> unify t1' t2
   | _, Type.Var({ contents = Some(t2') }) -> unify t1 t2'
@@ -148,6 +150,10 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         unify (Type.Array(t)) (g env e1);
         unify Type.Int (g env e2);
         Type.Unit
+    | List(es) ->
+        let t = Type.gentyp() in
+        List.iter (function e -> unify t (g env e)) es;
+        Type.List(t)
   with Unify(t1, t2) -> raise (Error(deref_term e, deref_typ t1, deref_typ t2))
 
 let f e =
