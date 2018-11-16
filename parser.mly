@@ -35,6 +35,8 @@ let addtyp x = (x, Type.gentyp ())
 %token SEMICOLON
 %token LPAREN
 %token RPAREN
+%token LBRACKET
+%token RBRACKET
 %token EOF
 
 /* (* 優先順位とassociativityの定義（低い方から高い方へ） (caml2html: parser_prior) *) */
@@ -127,6 +129,14 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | elems
     %prec prec_tuple
     { Tuple($1) }
+| LBRACKET RBRACKET
+    { List([]) }
+| LBRACKET exp RBRACKET
+    { let rec convert_list node data =
+        match node with
+          Let((_, Type.Unit), x, xs) -> convert_list xs (x :: data)
+        | _ -> (node :: data)
+      in List(List.rev (convert_list $2 [])) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
     { LetTuple($3, $6, $8) }
 | simple_exp DOT LPAREN exp RPAREN LESS_MINUS exp
