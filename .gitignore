@@ -17,6 +17,7 @@
 /._d
 *.cmi
 *.cmo
+*.dSYM
 /float.o
 /lexer.ml
 /min-caml
