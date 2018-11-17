@@ -24,12 +24,14 @@ type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | Put of Id.t * Id.t * Id.t
   | ExtArray of Id.t
   | ExtFunApp of Id.t * Id.t list
+  | EmptyList
+  | LAdd of Id.t * Id.t
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 let rec fv = function (* 式に出現する（自由な）変数 (caml2html: knormal_fv) *)
-  | Unit | Int(_) | Float(_) | ExtArray(_) -> S.empty
+  | Unit | Int(_) | Float(_) | ExtArray(_) | EmptyList -> S.empty
   | Neg(x) | FNeg(x) -> S.singleton x
-  | Add(x, y) | Sub(x, y) | FAdd(x, y) | FSub(x, y) | FMul(x, y) | FDiv(x, y) | Get(x, y) -> S.of_list [x; y]
+  | Add(x, y) | Sub(x, y) | FAdd(x, y) | FSub(x, y) | FMul(x, y) | FDiv(x, y) | Get(x, y) | LAdd(x, y) -> S.of_list [x; y]
   | IfEq(x, y, e1, e2) | IfLE(x, y, e1, e2) -> S.add x (S.add y (S.union (fv e1) (fv e2)))
   | Let((x, t), e1, e2) -> S.union (fv e1) (S.remove x (fv e2))
   | Var(x) -> S.singleton x
@@ -175,5 +177,17 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
         (fun x -> insert_let (g env e2)
             (fun y -> insert_let (g env e3)
                 (fun z -> Put(x, y, z), Type.Unit)))
+  | Syntax.List([]) -> EmptyList, Type.List(Type.gentyp())
+  | Syntax.List(e1 :: es) ->
+      insert_let (g env (Syntax.List(es)))
+        (fun y ->
+          let _, t1 as g_e1 = g env e1 in
+          insert_let g_e1
+            (fun x -> LAdd(x, y), Type.List(t1)))
+  | Syntax.LAdd(e1, e2) ->
+      let _, t1 as g_e1 = g env e1 in
+      insert_let g_e1
+        (fun x -> insert_let (g env e2)
+            (fun y -> LAdd(x, y), Type.List(t1)))
 
 let f e = fst (g M.empty e)
