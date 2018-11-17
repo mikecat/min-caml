@@ -82,6 +82,8 @@ rule token = parse
     { LBRACKET }
 | ']'
     { RBRACKET }
+| "::"
+    { COLON_COLON }
 | eof
     { EOF }
 | lower (digit|lower|upper|'_')* (* 他の「予約語」より後でないといけない *)

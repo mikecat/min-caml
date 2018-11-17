@@ -37,6 +37,7 @@ let addtyp x = (x, Type.gentyp ())
 %token RPAREN
 %token LBRACKET
 %token RBRACKET
+%token COLON_COLON
 %token EOF
 
 /* (* 優先順位とassociativityの定義（低い方から高い方へ） (caml2html: parser_prior) *) */
@@ -48,6 +49,7 @@ let addtyp x = (x, Type.gentyp ())
 %nonassoc prec_tuple
 %left COMMA
 %left EQUAL LESS_GREATER LESS GREATER LESS_EQUAL GREATER_EQUAL
+%right COLON_COLON
 %left PLUS MINUS PLUS_DOT MINUS_DOT
 %left AST_DOT SLASH_DOT
 %right prec_unary_minus
@@ -137,6 +139,8 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
           Let((_, Type.Unit), x, xs) -> convert_list xs (x :: data)
         | _ -> (node :: data)
       in List(List.rev (convert_list $2 [])) }
+| exp COLON_COLON exp
+    { LAdd($1, $3) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
     { LetTuple($3, $6, $8) }
 | simple_exp DOT LPAREN exp RPAREN LESS_MINUS exp
