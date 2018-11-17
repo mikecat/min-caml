@@ -154,6 +154,10 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t = Type.gentyp() in
         List.iter (function e -> unify t (g env e)) es;
         Type.List(t)
+    | LAdd(e1, e2) ->
+        let t = g env e1 in
+        unify (Type.List(t)) (g env e2);
+        Type.List(t)
   with Unify(t1, t2) -> raise (Error(deref_term e, deref_typ t1, deref_typ t2))
 
 let f e =
