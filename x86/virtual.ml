@@ -131,6 +131,17 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
       | Type.Array(_) -> Ans(St(z, x, V(y), 4))
       | _ -> assert false)
   | Closure.ExtArray(Id.L(x)) -> Ans(SetL(Id.L("min_caml_" ^ x)))
+  | Closure.EmptyList -> Ans(Set(0))
+  | Closure.LAdd(x, y) ->
+      let z = Id.genid "t" in
+      let x_type = M.find x env in
+      let ptr_offset, store_value =
+          if x_type = Type.Float
+          then 8, StDF(x, z, C(0), 1)
+          else 4, St(x, z, C(0), 1) in
+      Let((z, Type.List(x_type)), Mov(reg_hp),
+          Let((reg_hp, Type.Int), Add(reg_hp, C(align (ptr_offset + 4))),
+              seq(store_value, seq(St(y, z, C(ptr_offset), 1), Ans(Mov(z))))))
 
 (* 関数の仮想マシンコード生成 (caml2html: virtual_h) *)
 let h { Closure.name = (Id.L(x), t); Closure.args = yts; Closure.formal_fv = zts; Closure.body = e } =
