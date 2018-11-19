@@ -52,6 +52,7 @@
 /test/matmul-flat
 /test/non-tail-if
 /test/non-tail-if2
+/test/prime
 /test/print
 /test/shuffle
 /test/spill
