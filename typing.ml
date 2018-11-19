@@ -49,6 +49,7 @@ let rec deref_term = function
   | Get(e1, e2) -> Get(deref_term e1, deref_term e2)
   | Put(e1, e2, e3) -> Put(deref_term e1, deref_term e2, deref_term e3)
   | List(e) -> List(List.map deref_term e)
+  | LAdd(e1, e2) -> LAdd(deref_term e1, deref_term e2)
   | e -> e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
