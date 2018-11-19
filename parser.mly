@@ -146,6 +146,7 @@ exp: /* (* ∞Ï»Ã§Œº∞ (caml2html: parser_exp) *) */
 | exp COLON_COLON exp
     { LAdd($1, $3) }
 | MATCH exp WITH LBRACKET RBRACKET MINUS_GREATER exp OR IDENT COLON_COLON IDENT MINUS_GREATER exp
+    %prec prec_let
     { Match($2, $7, addtyp $9, addtyp $11, $13) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
     { LetTuple($3, $6, $8) }
