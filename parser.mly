@@ -38,6 +38,10 @@ let addtyp x = (x, Type.gentyp ())
 %token LBRACKET
 %token RBRACKET
 %token COLON_COLON
+%token MATCH
+%token WITH
+%token MINUS_GREATER
+%token OR
 %token EOF
 
 /* (* 優先順位とassociativityの定義（低い方から高い方へ） (caml2html: parser_prior) *) */
@@ -141,6 +145,8 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
     { Tuple($1) }
 | exp COLON_COLON exp
     { LAdd($1, $3) }
+| MATCH exp WITH LBRACKET RBRACKET MINUS_GREATER exp OR IDENT COLON_COLON IDENT MINUS_GREATER exp
+    { Match($2, $7, addtyp $9, addtyp $11, $13) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
     { LetTuple($3, $6, $8) }
 | simple_exp DOT LPAREN exp RPAREN LESS_MINUS exp

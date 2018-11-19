@@ -84,6 +84,14 @@ rule token = parse
     { RBRACKET }
 | "::"
     { COLON_COLON }
+| "match"
+    { MATCH }
+| "with"
+    { WITH }
+| "->"
+    { MINUS_GREATER }
+| '|'
+    { OR }
 | eof
     { EOF }
 | lower (digit|lower|upper|'_')* (* 他の「予約語」より後でないといけない *)
