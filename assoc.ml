@@ -15,4 +15,5 @@ let rec f = function (* ネストしたletの簡約 (caml2html: assoc_f) *)
   | LetRec({ name = xt; args = yts; body = e1 }, e2) ->
       LetRec({ name = xt; args = yts; body = f e1 }, f e2)
   | LetTuple(xts, y, e) -> LetTuple(xts, y, f e)
+  | Match(x, e1, y, z, e2) -> Match(x, f e1, y, z, f e2)
   | e -> e

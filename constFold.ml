@@ -45,6 +45,7 @@ let rec g env = function (* 定数畳み込みルーチン本体 (caml2html: constfold_g) *)
         xts
         (findt y env)
   | LetTuple(xts, y, e) -> LetTuple(xts, y, g env e)
+  | Match(x, e1, y, z, e2) -> Match(x, g env e1, y, z, g env e2)
   | e -> e
 
 let f = g M.empty

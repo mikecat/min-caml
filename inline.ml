@@ -27,6 +27,7 @@ let rec g env = function (* インライン展開ルーチン本体 (caml2html: inline_g) *)
           ys in
       Alpha.g env' e
   | LetTuple(xts, y, e) -> LetTuple(xts, y, g env e)
+  | Match(x, e1, y, z, e2) -> Match(x, g env e1, y, z, g env e2)
   | e -> e
 
 let f e = g M.empty e

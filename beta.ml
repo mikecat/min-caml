@@ -36,5 +36,6 @@ let rec g env = function (* β簡約ルーチン本体 (caml2html: beta_g) *)
   | ExtFunApp(x, ys) -> ExtFunApp(x, List.map (fun y -> find y env) ys)
   | EmptyList -> EmptyList
   | LAdd(x, y) -> LAdd(find x env, find y env)
+  | Match(x, e1, (y, yt), (z, zt), e2) -> Match(find x env, g env e1, (y, yt), (z, zt), g env e2)
 
 let f = g M.empty
