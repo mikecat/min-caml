@@ -50,6 +50,7 @@ let rec deref_term = function
   | Put(e1, e2, e3) -> Put(deref_term e1, deref_term e2, deref_term e3)
   | List(e) -> List(List.map deref_term e)
   | LAdd(e1, e2) -> LAdd(deref_term e1, deref_term e2)
+  | Match(e1, e2, xt, yt, e3) -> Match(deref_term e1, deref_term e2, deref_id_typ xt, deref_id_typ yt, deref_term e3)
   | e -> e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
@@ -159,6 +160,13 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t = g env e1 in
         unify (Type.List(t)) (g env e2);
         Type.List(t)
+    | Match(e1, e2, (x, tx), (y, ty), e3) ->
+        unify (Type.List(tx)) ty;
+        unify (g env e1) ty;
+        let t2 = g env e2 in
+        let t3 = g (M.add_list [(x, tx); (y, ty)] env) e3 in
+        unify t2 t3;
+        t2
   with Unify(t1, t2) -> raise (Error(deref_term e, deref_typ t1, deref_typ t2))
 
 let f e =
