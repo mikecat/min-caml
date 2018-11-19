@@ -26,6 +26,7 @@ type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | ExtFunApp of Id.t * Id.t list
   | EmptyList
   | LAdd of Id.t * Id.t
+  | Match of Id.t * t * (Id.t * Type.t) * (Id.t * Type.t) * t
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 let rec fv = function (* 式に出現する（自由な）変数 (caml2html: knormal_fv) *)
@@ -42,6 +43,9 @@ let rec fv = function (* 式に出現する（自由な）変数 (caml2html: knormal_fv) *)
   | Tuple(xs) | ExtFunApp(_, xs) -> S.of_list xs
   | Put(x, y, z) -> S.of_list [x; y; z]
   | LetTuple(xs, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xs)))
+  | Match(x, e1, (y, yt), (z, zt), e2) ->
+      let ws = S.diff (fv e2) (S.of_list [y; z]) in
+      S.add x (S.union (fv e1) ws)
 
 let insert_let (e, t) k = (* letを挿入する補助関数 (caml2html: knormal_insert) *)
   match e with
@@ -189,5 +193,11 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       insert_let g_e1
         (fun x -> insert_let (g env e2)
             (fun y -> LAdd(x, y), Type.List(t1)))
+  | Syntax.Match(e1, e2, xt, yt, e3) ->
+      insert_let (g env e1)
+        (fun x ->
+          let e2', t2 = g env e2 in
+          let e3', t3 = g (M.add_list [xt; yt] env) e3 in
+          Match(x, e2', xt, yt, e3'), t2)
 
 let f e = fst (g M.empty e)

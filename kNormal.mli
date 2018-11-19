@@ -24,6 +24,7 @@ type t =
   | ExtFunApp of Id.t * Id.t list
   | EmptyList
   | LAdd of Id.t * Id.t
+  | Match of Id.t * t * (Id.t * Type.t) * (Id.t * Type.t) * t
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 val fv : t -> S.t
