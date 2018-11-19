@@ -77,6 +77,14 @@ simple_exp: /* (* 括弧をつけなくても関数の引数になれる式 (caml2html: parser_simp
     { Var($1) }
 | simple_exp DOT LPAREN exp RPAREN
     { Get($1, $4) }
+| LBRACKET RBRACKET
+    { List([]) }
+| LBRACKET exp RBRACKET
+    { let rec convert_list node data =
+        match node with
+          Let((_, Type.Unit), x, xs) -> convert_list xs (x :: data)
+        | _ -> (node :: data)
+      in List(List.rev (convert_list $2 [])) }
 
 exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | simple_exp
@@ -131,14 +139,6 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | elems
     %prec prec_tuple
     { Tuple($1) }
-| LBRACKET RBRACKET
-    { List([]) }
-| LBRACKET exp RBRACKET
-    { let rec convert_list node data =
-        match node with
-          Let((_, Type.Unit), x, xs) -> convert_list xs (x :: data)
-        | _ -> (node :: data)
-      in List(List.rev (convert_list $2 [])) }
 | exp COLON_COLON exp
     { LAdd($1, $3) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
