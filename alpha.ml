@@ -44,5 +44,10 @@ let rec g env = function (* α変換ルーチン本体 (caml2html: alpha_g) *)
   | ExtFunApp(x, ys) -> ExtFunApp(x, List.map (fun y -> find y env) ys)
   | EmptyList -> EmptyList
   | LAdd(x, y) -> LAdd(find x env, find y env)
+  | Match(x, e1, (y, yt), (z, zt), e2) ->
+      let y' = Id.genid y in
+      let z' = Id.genid z in
+      let env' = M.add z z' (M.add y y' env) in
+      Match(find x env, g env e1, (y', yt), (z', zt), g env' e2)
 
 let f = g M.empty
