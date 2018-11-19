@@ -25,6 +25,7 @@ type t =
   | ExtArray of Id.l
   | EmptyList
   | LAdd of Id.t * Id.t
+  | Match of Id.t * t * (Id.t * Type.t) * (Id.t * Type.t) * t
 type fundef = { name : Id.l * Type.t;
                 args : (Id.t * Type.t) list;
                 formal_fv : (Id.t * Type.t) list;

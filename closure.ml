@@ -25,6 +25,7 @@ type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
   | ExtArray of Id.l
   | EmptyList
   | LAdd of Id.t * Id.t
+  | Match of Id.t * t * (Id.t * Type.t) * (Id.t * Type.t) * t
 type fundef = { name : Id.l * Type.t;
                 args : (Id.t * Type.t) list;
                 formal_fv : (Id.t * Type.t) list;
@@ -43,6 +44,7 @@ let rec fv = function
   | AppDir(_, xs) | Tuple(xs) -> S.of_list xs
   | LetTuple(xts, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xts)))
   | Put(x, y, z) -> S.of_list [x; y; z]
+  | Match(x, e1, (y, yt), (z, zt), e2) -> S.add x (S.union (fv e1) (S.remove y (S.remove z (fv e2))))
 
 let toplevel : fundef list ref = ref []
 
@@ -103,6 +105,7 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure
   | KNormal.ExtFunApp(x, ys) -> AppDir(Id.L("min_caml_" ^ x), ys)
   | KNormal.EmptyList -> EmptyList
   | KNormal.LAdd(x, y) -> LAdd(x, y)
+  | KNormal.Match(x, e1, (y, yt), (z, zt), e2) -> Match(x, g env known e1, (y, yt), (z, zt), g (M.add z zt (M.add y yt env)) known e2)
 
 let f e =
   toplevel := [];
