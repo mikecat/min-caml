@@ -136,9 +136,10 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
       let z = Id.genid "t" in
       let x_type = M.find x env in
       let ptr_offset, store_value =
-          if x_type = Type.Float
-          then 8, StDF(x, z, C(0), 1)
-          else 4, St(x, z, C(0), 1) in
+          match x_type with
+            Type.Float -> 8, StDF(x, z, C(0), 1)
+          | Type.Unit -> 0, Nop
+          | _ -> 4, St(x, z, C(0), 1) in
       Let((z, Type.List(x_type)), Mov(reg_hp),
           Let((reg_hp, Type.Int), Add(reg_hp, C(align (ptr_offset + 4))),
               seq(store_value, seq(St(y, z, C(ptr_offset), 1), Ans(Mov(z))))))
@@ -146,9 +147,10 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
       (match (M.find x env) with
         Type.List(x_type) ->
           let ptr_offset, load_value =
-              if x_type = Type.Float
-              then 8, LdDF(x, C(0), 1)
-              else 4, Ld(x, C(0), 1) in
+              match x_type with
+                Type.Float -> 8, LdDF(x, C(0), 1)
+              | Type.Unit -> 0, Nop
+              | _ -> 4, Ld(x, C(0), 1) in
           let e2' = g (M.add z zt (M.add y yt env)) e2 in
           Ans(IfEq(x, C(0), g env e1,
               Let((y, yt), load_value,

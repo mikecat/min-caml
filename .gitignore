@@ -49,6 +49,7 @@
 /test/list-float
 /test/list-reverse
 /test/list-transpose
+/test/list-unit
 /test/manyargs
 /test/matmul
 /test/matmul-flat
