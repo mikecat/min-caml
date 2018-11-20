@@ -9,10 +9,17 @@ let memf x env =
 let memt x env =
   try (match M.find x env with Tuple(_) -> true | _ -> false)
   with Not_found -> false
+let memel x env =
+  try (match M.find x env with EmptyList -> true | _ -> false)
+  with Not_found -> false
+let memla x env =
+  try (match M.find x env with LAdd(_, _) -> true | _ -> false)
+  with Not_found -> false
 
 let findi x env = (match M.find x env with Int(i) -> i | _ -> raise Not_found)
 let findf x env = (match M.find x env with Float(d) -> d | _ -> raise Not_found)
 let findt x env = (match M.find x env with Tuple(ys) -> ys | _ -> raise Not_found)
+let findla x env = (match M.find x env with LAdd(y, ys) -> y, ys | _ -> raise Not_found)
 
 let rec g env = function (* 定数畳み込みルーチン本体 (caml2html: constfold_g) *)
   | Var(x) when memi x env -> Int(findi x env)
@@ -45,6 +52,10 @@ let rec g env = function (* 定数畳み込みルーチン本体 (caml2html: constfold_g) *)
         xts
         (findt y env)
   | LetTuple(xts, y, e) -> LetTuple(xts, y, g env e)
+  | Match(x, e1, y, z, e2) when memel x env -> g env e1
+  | Match(x, e1, y, z, e2) when memla x env ->
+      let xv, xvs = findla x env in
+      Let(y, Var(xv), Let(z, Var(xvs), g env e2))
   | Match(x, e1, y, z, e2) -> Match(x, g env e1, y, z, g env e2)
   | e -> e
 
