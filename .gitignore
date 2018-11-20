@@ -47,6 +47,7 @@
 /test/join-stack2
 /test/join-stack3
 /test/list-reverse
+/test/list-transpose
 /test/manyargs
 /test/matmul
 /test/matmul-flat
