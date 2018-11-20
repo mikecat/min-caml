@@ -46,6 +46,7 @@
 /test/join-stack
 /test/join-stack2
 /test/join-stack3
+/test/list-float
 /test/list-reverse
 /test/list-transpose
 /test/manyargs
