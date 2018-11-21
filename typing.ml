@@ -133,7 +133,8 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         g env e2
     | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
         let t = Type.gentyp () in
-        unify (g env e) (Type.Fun(List.map (g env) es, t));
+        let f = (g env e) in
+        unify (Type.copy f) (Type.Fun(List.map (g env) es, t));
         t
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
     | LetTuple(xts, e1, e2) ->
