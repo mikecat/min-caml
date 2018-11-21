@@ -17,6 +17,7 @@ let rec id_of_typ = function
   | Type.Int -> "i"
   | Type.Float -> "d"
   | Type.Fun _ -> "f"
+  | Type.Multi _ -> "m"
   | Type.Tuple _ -> "t"
   | Type.Array _ -> "a" 
   | Type.List _ -> "l"

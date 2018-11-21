@@ -10,6 +10,10 @@ let extenv = ref M.empty
 (* for pretty printing (and type normalization) *)
 let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_deref) *)
   | Type.Fun(t1s, t2) -> Type.Fun(List.map deref_typ t1s, deref_typ t2)
+  | Type.Multi(g, us) ->
+      let us' = List.map deref_typ !us in
+      us := us';
+      Type.Multi(deref_typ g, ref us')
   | Type.Tuple(ts) -> Type.Tuple(List.map deref_typ ts)
   | Type.Array(t) -> Type.Array(deref_typ t)
   | Type.Var({ contents = None } as r) ->
@@ -69,6 +73,7 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)));
       unify t1' t2'
+  | Type.Multi(t1, u1s), Type.Multi(t2, u2s) -> unify t1 t2
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)))
@@ -129,13 +134,22 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         t
     | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
         let env = M.add x t env in
-        unify t (Type.Fun(List.map snd yts, g (M.add_list yts env) e1));
+        unify t (Type.Multi(Type.Fun(List.map snd yts, g (M.add_list yts env) e1), ref []));
         g env e2
     | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
-        let t = Type.gentyp () in
-        let f = (g env e) in
-        unify (Type.copy f) (Type.Fun(List.map (g env) es, t));
-        t
+        let rt = Type.gentyp () in
+        let b = Type.Fun(List.map (g env) es, rt) in
+        let rec unify_multi mt =
+        (match mt with
+          Type.Multi(ge, us) ->
+            let ge' = Type.copy ge in
+            unify ge' b;
+            us := ge' :: !us
+        | Type.Var({ contents = Some(t) }) -> unify_multi t
+        | Type.Var({ contents = None }) -> unify mt (Type.Multi(b, ref [Type.copy b]))
+        | u -> unify u b);
+        in unify_multi (g env e);
+        rt
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
     | LetTuple(xts, e1, e2) ->
         unify (Type.Tuple(List.map snd xts)) (g env e1);
