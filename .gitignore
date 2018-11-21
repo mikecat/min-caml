@@ -48,6 +48,7 @@
 /test/join-stack3
 /test/list-float
 /test/list-fold
+/test/list-multi
 /test/list-reverse
 /test/list-transpose
 /test/list-unit
