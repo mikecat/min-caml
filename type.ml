@@ -9,8 +9,15 @@ type t = (* MinCamlの型を表現するデータ型 (caml2html: type_t) *)
   | Array of t
   | List of t
   | Var of t option ref
+  | Wild of int (* placeholder for uninstantiated type variables *)
 
 let gentyp () = Var(ref None) (* 新しい型変数を作る *)
+
+let wild_counter = ref 0
+let genwild () =
+  let c = !wild_counter in
+  wild_counter := c + 1;
+	Wild(c)
 
 let rec copy env = function
   | Unit -> Unit

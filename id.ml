@@ -22,6 +22,7 @@ let rec id_of_typ = function
   | Type.Array _ -> "a" 
   | Type.List _ -> "l"
   | Type.Var _ -> assert false
+  | Type.Wild _ -> assert false
 let gentmp typ =
   incr counter;
   Printf.sprintf "T%s%d" (id_of_typ typ) !counter
