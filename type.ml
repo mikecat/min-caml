@@ -12,15 +12,22 @@ type t = (* MinCamlの型を表現するデータ型 (caml2html: type_t) *)
 
 let gentyp () = Var(ref None) (* 新しい型変数を作る *)
 
-let rec copy = function
+let rec copy env = function
   | Unit -> Unit
   | Bool -> Bool
   | Int -> Int
   | Float -> Float
-  | Fun(xs, y) -> Fun(List.map copy xs, copy y)
-  | Multi(g, us) -> Multi(copy g, ref (List.map copy !us))
-  | Tuple(xs) -> Tuple(List.map copy xs)
-  | Array(t) -> Array(copy t)
-  | List(t) -> List(copy t)
-  | Var({ contents = None }) -> Var(ref None)
-  | Var({ contents = Some(t) }) -> Var(ref (Some(copy t)))
+  | Fun(xs, y) -> Fun(List.map (copy env) xs, copy env y)
+  | Multi(g, us) -> Multi(copy env g, ref (List.map (copy env) !us))
+  | Tuple(xs) -> Tuple(List.map (copy env) xs)
+  | Array(t) -> Array(copy env t)
+  | List(t) -> List(copy env t)
+  | Var(c) when List.mem_assq c !env -> Var(List.assq c !env)
+  | Var({ contents = None } as c) ->
+      let c' = ref None in
+      env := ((c, c') :: !env);
+      Var(c')
+  | Var({ contents = Some(t) } as c) ->
+      let c' = ref (Some(copy env t)) in
+      env := ((c, c') :: !env);
+      Var(c')

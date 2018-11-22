@@ -142,11 +142,11 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let rec unify_multi mt =
         (match mt with
           Type.Multi(ge, us) ->
-            let ge' = Type.copy ge in
+            let ge' = Type.copy (ref []) ge in
             unify ge' b;
             us := ge' :: !us
         | Type.Var({ contents = Some(t) }) -> unify_multi t
-        | Type.Var({ contents = None }) -> unify mt (Type.Multi(b, ref [Type.copy b]))
+        | Type.Var({ contents = None }) -> unify mt (Type.Multi(b, ref [Type.copy (ref []) b]))
         | u -> unify u b);
         in unify_multi (g env e);
         rt
