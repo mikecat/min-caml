@@ -158,7 +158,7 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
       | _ -> assert false)
 
 let rec deref_multi = function
-  | Type.Multi(_, { contents = { contents = t :: _ }}) -> deref_multi t
+  | Type.Multi(_, t :: _) -> deref_multi t
   | t -> t
 
 (* 関数の仮想マシンコード生成 (caml2html: virtual_h) *)
