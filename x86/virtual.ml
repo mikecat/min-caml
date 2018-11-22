@@ -157,6 +157,10 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
                   Let((z, zt), Ld(x, C(ptr_offset), 1), e2'))))
       | _ -> assert false)
 
+let rec deref_multi = function
+  | Type.Multi(_, { contents = t :: _ }) -> deref_multi t
+  | t -> t
+
 (* 関数の仮想マシンコード生成 (caml2html: virtual_h) *)
 let h { Closure.name = (Id.L(x), t); Closure.args = yts; Closure.formal_fv = zts; Closure.body = e } =
   let (int, float) = separate yts in
@@ -166,10 +170,10 @@ let h { Closure.name = (Id.L(x), t); Closure.args = yts; Closure.formal_fv = zts
       (4, g (M.add x t (M.add_list yts (M.add_list zts M.empty))) e)
       (fun z offset load -> fletd(z, LdDF(x, C(offset), 1), load))
       (fun z t offset load -> Let((z, t), Ld(x, C(offset), 1), load)) in
-  match t with
+  match (deref_multi t) with
   | Type.Fun(_, t2) ->
       { name = Id.L(x); args = int; fargs = float; body = load; ret = t2 }
-  | _ -> assert false
+  | t -> raise (Typing.Error(Syntax.Unit, t, t)) ; assert false
 
 (* プログラム全体の仮想マシンコード生成 (caml2html: virtual_f) *)
 let f (Closure.Prog(fundefs, e)) =

@@ -74,7 +74,13 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)));
       unify t1' t2'
-  | Type.Multi(t1, u1s), Type.Multi(t2, u2s) -> unify t1 t2
+  | Type.Multi(t1, u1s), Type.Multi(t2, u2s) ->
+      unify t1 t2;
+      List.iter (fun t -> unify (Type.copy (ref []) t2) t) !u1s;
+      List.iter (fun t -> unify (Type.copy (ref []) t1) t) !u2s;
+      let us = !u1s @ !u2s in
+      u1s := us;
+      u2s := us
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)))
@@ -147,7 +153,7 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
             unify ge' b;
             us := ge' :: !us
         | Type.Var({ contents = Some(t) }) -> unify_multi t
-        | Type.Var({ contents = None }) -> unify mt (Type.Multi(b, ref [Type.copy (ref []) b]))
+        | Type.Var({ contents = None }) -> unify mt (Type.Multi(Type.copy (ref []) b, ref [b]))
         | u -> unify u b);
         in unify_multi (g env e);
         rt
