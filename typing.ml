@@ -63,6 +63,7 @@ let rec deref_term deref_typ = function
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
   | Type.Fun(t2s, t2) -> List.exists (occur r1) t2s || occur r1 t2
+  | Type.MMulti(t2, _, _) -> occur r1 t2
   | Type.Tuple(t2s) -> List.exists (occur r1) t2s
   | Type.Array(t2) | Type.List(t2) -> occur r1 t2
   | Type.Var(r2) when r1 == r2 -> true
@@ -78,6 +79,7 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
       with Invalid_argument(_) -> raise (Unify(t1, t2)));
       unify t1' t2'
   | Type.MMulti(t1, u1s, af1), Type.MMulti(t2, u2s, af2) ->
+      let env = ref [] in unify (Type.copy env t1) (Type.copy env t2); (* general compatibility check *)
       List.iter !af1 !u2s;
       List.iter !af2 !u1s;
       let paf1 = !af1 in
