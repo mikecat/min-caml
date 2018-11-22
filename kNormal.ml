@@ -125,7 +125,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       LetRec({ name = (x, t); args = yts; body = e1' }, e2'), t2
   | Syntax.App(Syntax.Var(f), e2s) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
-      | Type.Multi(_, { contents = (Type.Fun(_, t)) :: _ }) | Type.Fun(_, t) ->
+      | Type.Multi(_, { contents = { contents = (Type.Fun(_, t)) :: _ }}) | Type.Fun(_, t) ->
           let rec bind xs = function (* "xs" are identifiers for the arguments *)
             | [] -> ExtFunApp(f, xs), t
             | e2 :: e2s ->
@@ -135,7 +135,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       | _ -> assert false)
   | Syntax.App(e1, e2s) ->
       (match g env e1 with
-      | x, Type.Multi(_, { contents = (Type.Fun(_, t) as xt) :: _ })
+      | x, Type.Multi(_, { contents = { contents = (Type.Fun(_, t) as xt) :: _ }})
       | x, (Type.Fun(_, t) as xt) ->
           insert_let (x, xt)
             (fun f ->

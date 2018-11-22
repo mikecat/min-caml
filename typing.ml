@@ -11,9 +11,9 @@ let extenv = ref M.empty
 let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_deref) *)
   | Type.Fun(t1s, t2) -> Type.Fun(List.map deref_typ t1s, deref_typ t2)
   | Type.Multi(g, us) ->
-      let us' = List.map deref_typ !us in
-      us := us';
-      Type.Multi(deref_typ g, ref us')
+      let us' = List.map deref_typ ! !us in
+      !us := us';
+      Type.Multi(deref_typ g, us)
   | Type.Tuple(ts) -> Type.Tuple(List.map deref_typ ts)
   | Type.Array(t) -> Type.Array(deref_typ t)
   | Type.Var({ contents = None } as r) ->
@@ -76,9 +76,9 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
       unify t1' t2'
   | Type.Multi(t1, u1s), Type.Multi(t2, u2s) ->
       unify t1 t2;
-      List.iter (fun t -> unify (Type.copy (ref []) t2) t) !u1s;
-      List.iter (fun t -> unify (Type.copy (ref []) t1) t) !u2s;
-      let us = !u1s @ !u2s in
+      List.iter (fun t -> unify (Type.copy (ref []) t2) t) ! !u1s;
+      List.iter (fun t -> unify (Type.copy (ref []) t1) t) ! !u2s;
+      let us = ref (! !u1s @ ! !u2s) in
       u1s := us;
       u2s := us
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
@@ -141,7 +141,7 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         t
     | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
         let env = M.add x t env in
-        unify t (Type.Multi(Type.Fun(List.map snd yts, g (M.add_list yts env) e1), ref []));
+        unify t (Type.Multi(Type.Fun(List.map snd yts, g (M.add_list yts env) e1), ref (ref [])));
         g env e2
     | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
         let rt = Type.gentyp () in
@@ -151,9 +151,9 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
           Type.Multi(ge, us) ->
             let ge' = Type.copy (ref []) ge in
             unify ge' b;
-            us := ge' :: !us
+            !us := ge' :: ! !us
         | Type.Var({ contents = Some(t) }) -> unify_multi t
-        | Type.Var({ contents = None }) -> unify mt (Type.Multi(Type.copy (ref []) b, ref [b]))
+        | Type.Var({ contents = None }) -> unify mt (Type.Multi(Type.copy (ref []) b, ref (ref [b])))
         | u -> unify u b);
         in unify_multi (g env e);
         rt

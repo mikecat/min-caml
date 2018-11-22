@@ -4,7 +4,7 @@ type t = (* MinCamlの型を表現するデータ型 (caml2html: type_t) *)
   | Int
   | Float
   | Fun of t list * t (* arguments are uncurried *)
-  | Multi of t * t list ref
+  | Multi of t * t list ref ref
   | Tuple of t list
   | Array of t
   | List of t
@@ -25,7 +25,7 @@ let rec copy env = function
   | Int -> Int
   | Float -> Float
   | Fun(xs, y) -> Fun(List.map (copy env) xs, copy env y)
-  | Multi(g, us) -> Multi(copy env g, ref (List.map (copy env) !us))
+  | Multi(g, us) -> Multi(copy env g, us) (* don't copy and refer usage information *)
   | Tuple(xs) -> Tuple(List.map (copy env) xs)
   | Array(t) -> Array(copy env t)
   | List(t) -> List(copy env t)
