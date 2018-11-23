@@ -9,11 +9,10 @@ let extenv = ref M.empty
 
 (* for pretty printing (and type normalization) *)
 let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_deref) *)
-  | Type.Fun(t1s, t2) -> Type.Fun(List.map deref_typ t1s, deref_typ t2)
-  | Type.MMulti(g, us, af) ->
-      let us' = List.map deref_typ !us in
+  | Type.MFun(t1s, t2, us, f) ->
+      let us' = List.sort_uniq compare (List.map (fun (ts, t) -> (List.map deref_typ ts, deref_typ t)) !us) in
       us := us';
-      Type.Multi(deref_typ g, us')
+      Type.Fun(List.map deref_typ t1s, deref_typ t2, us')
   | Type.Tuple(ts) -> Type.Tuple(List.map deref_typ ts)
   | Type.Array(t) -> Type.Array(deref_typ t)
   | Type.Var({ contents = None } as r) ->
@@ -62,8 +61,7 @@ let rec deref_term deref_typ = function
   | e -> e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
-  | Type.Fun(t2s, t2) -> List.exists (occur r1) t2s || occur r1 t2
-  | Type.MMulti(t2, _, _) -> occur r1 t2
+  | Type.MFun(t2s, t2, _, _) -> List.exists (occur r1) t2s || occur r1 t2
   | Type.Tuple(t2s) -> List.exists (occur r1) t2s
   | Type.Array(t2) | Type.List(t2) -> occur r1 t2
   | Type.Var(r2) when r1 == r2 -> true
@@ -74,18 +72,17 @@ let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
 let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing_unify) *)
   match t1, t2 with
   | Type.Unit, Type.Unit | Type.Bool, Type.Bool | Type.Int, Type.Int | Type.Float, Type.Float -> ()
-  | Type.Fun(t1s, t1'), Type.Fun(t2s, t2') ->
-      (try List.iter2 unify t1s t2s
+  | Type.MFun(t1s, t1', u1s, f1), Type.MFun(t2s, t2', u2s, f2) ->
+      let env = ref [] in
+      (try List.iter2 (fun x y -> unify (Type.copy env x) (Type.copy env y)) t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)));
-      unify t1' t2'
-  | Type.MMulti(t1, u1s, af1), Type.MMulti(t2, u2s, af2) ->
-      let env = ref [] in unify (Type.copy env t1) (Type.copy env t2); (* general compatibility check *)
-      List.iter !af1 !u2s;
-      List.iter !af2 !u1s;
-      let paf1 = !af1 in
-      let paf2 = !af2 in
-      af1 := (fun t -> paf1 t; paf2 t);
-      af2 := (fun t -> paf2 t; paf1 t);
+      unify (Type.copy env t1') (Type.copy env t2');
+      List.iter !f1 !u2s;
+      List.iter !f2 !u1s;
+      let f1' = !f1 in
+      let f2' = !f2 in
+      f1 := (fun t -> f1' t; f2' t);
+      f2 := (fun t -> f2' t; f1' t)
   | Type.Tuple(t1s), Type.Tuple(t2s) ->
       (try List.iter2 unify t1s t2s
       with Invalid_argument(_) -> raise (Unify(t1, t2)))
@@ -99,18 +96,21 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
   | _, Type.Var({ contents = None } as r2) ->
       if occur r2 t1 then raise (Unify(t1, t2));
       r2 := Some(t1)
-  | Type.MMulti(_, _, af1), _ -> !af1 t2
-  | _, Type.MMulti(_, _, af2) -> !af2 t1
   | _, _ -> raise (Unify(t1, t2))
 
 let rec adjust_mmatch = function
-  | Type.Fun(t1s, t2) -> Type.Fun(List.map adjust_mmatch t1s, adjust_mmatch t2)
-  | Type.MMulti(g, us, af) ->
-      let g' = adjust_mmatch g in
-      let us' = List.map adjust_mmatch !us in
-      List.iter (fun t -> unify (Type.copy (ref []) g') t) us';
-      us := us';
-      Type.MMulti(g', us, af)
+  | Type.MFun(t1s, t2, us, f) ->
+      let copy (ts, t) =
+          let env = ref [] in
+          (List.map (Type.copy env) ts, Type.copy env t) in
+      let unify2 (t1s, t1) (t2s, t2) =
+          List.iter2 unify t1s t2s;
+          unify t1 t2 in
+      let t1s' = List.map adjust_mmatch t1s in
+      let t2' = adjust_mmatch t2 in
+      List.iter (fun t -> unify2 (copy (t1s', t2')) t) !us;
+      us := List.map (fun (ts, t) -> (List.map adjust_mmatch ts, adjust_mmatch t)) !us;
+      Type.MFun(t1s', t2', us, f)
   | Type.Tuple(ts) -> Type.Tuple(List.map adjust_mmatch ts)
   | Type.Array(t) -> Type.Array(adjust_mmatch t)
   | Type.List(t) -> Type.List(adjust_mmatch t)
@@ -164,13 +164,48 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         t
     | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
         let env = M.add x t env in
-        let ft = Type.Fun(List.map snd yts, g (M.add_list yts env) e1) in
         let l = ref [] in
-        unify t (Type.MMulti(ft, l, ref (fun t -> (unify t (Type.copy (ref []) ft); l := t :: !l))));
+        let tenv = ref [] in
+        let ts' = List.map (fun xt -> Type.Var({ contents = Some(snd xt) })) yts in
+        let t' = Type.Var({ contents = Some(g (M.add_list yts env) e1) }) in
+        unify t (Type.MFun(ts', t', l, ref (fun ts -> l := ts :: !l)));
+        let rec copy_general = function
+            | Type.MFun(gts, gt, _, _) ->
+                let tenv = ref [] in
+                let copy_type = function
+                    | Type.Var({ contents = Some(t) } as tr) -> tr := Some(Type.copy tenv t)
+                    | Type.Var({ contents = None }) -> ()
+                    | _ -> Format.eprintf "cannot modify type to copy in let rec@.";
+                           assert false in
+                List.iter copy_type gts;
+                copy_type gt
+            | Type.Var({ contents = Some(t) }) -> copy_general t
+            | _ ->
+                Format.eprintf "new symbol in let rec is not a function@.";
+                assert false in
+        copy_general t;
         g env e2
     | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
         let t = Type.gentyp () in
-        unify (g env e) (Type.Fun(List.map (g env) es, t));
+        let ts = List.map (g env) es in
+        let rec unify_app = function
+            | Type.MFun(ats, rt, us, f) ->
+                let tenv = ref [] in
+                let ats' = List.map (Type.copy tenv) ats in
+                let rt' = Type.copy tenv rt in
+                List.iter2 unify ts ats';
+                unify t rt';
+                !f (ts, t)
+            | Type.Var({ contents = Some(t') }) -> unify_app t'
+            | Type.Var({ contents = None } as tr) ->
+                let tenv = ref [] in
+                let l = ref [(ts, t)] in
+                let ts' = List.map (fun t -> Type.Var({ contents = Some(t) })) ts in
+                tr := Some(Type.MFun(ts', Type.Var({ contents = Some(t) }), l, ref (fun ts -> l := ts :: !l)))
+            | _ ->
+                Format.eprintf "tried to apply what is not a function@.";
+                assert false in
+        unify_app (g env e);
         t
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
     | LetTuple(xts, e1, e2) ->
