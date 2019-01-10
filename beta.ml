@@ -24,8 +24,9 @@ let rec g env = function (* β簡約ルーチン本体 (caml2html: beta_g) *)
       | e1' ->
           let e2' = g env e2 in
           Let((x, t), e1', e2'))
-  | LetRec({ name = xt; args = yts; body = e1 }, e2) ->
-      LetRec({ name = xt; args = yts; body = g env e1 }, g env e2)
+  | LetRec(defs, e2) ->
+      LetRec(List.map (fun { name = xt; args = yts; body = e1 } ->
+                           { name = xt; args = yts; body = g env e1 }) defs, g env e2)
   | Var(x) -> Var(find x env) (* 変数を置換 (caml2html: beta_var) *)
   | Tuple(xs) -> Tuple(List.map (fun x -> find x env) xs)
   | LetTuple(xts, y, e) -> LetTuple(xts, find y env, g env e)
