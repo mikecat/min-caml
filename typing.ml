@@ -85,6 +85,12 @@ let rec unify t1 t2 = (* 型が合うように、型変数への代入をする (caml2html: typing
       r2 := Some(t1)
   | _, _ -> raise (Unify(t1, t2))
 
+let rec transpose l = match l with
+    []::_ -> []
+  | l -> (List.map List.hd l) :: (transpose (List.map List.tl l))
+
+let zip a b = List.map2 (fun x y -> (x, y)) a b
+
 let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
   try
     match e with
@@ -118,30 +124,32 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t3 = g env e3 in
         unify t2 t3;
         t2
-    | Let((x, t::_), e1::_, e2) -> (* letの型推論 (caml2html: typing_let) *)
-        unify t (g env e1);
-        g (M.add x t env) e2
-    | Var(x, _) when M.mem x env -> M.find x env (* 変数の型推論 (caml2html: typing_var) *)
+    | Let((x, ts), e1s, e2) -> (* letの型推論 (caml2html: typing_let) *)
+        List.iter2 unify ts (List.map (g env) e1s);
+        g (Vm.add_v x ts env) e2
+    | Var(x, n) when Vm.mem (x, n) env -> Vm.find (x, n) env (* 変数の型推論 (caml2html: typing_var) *)
     | Var(x, _) when M.mem x !extenv -> M.find x !extenv
     | Var(x, _) -> (* 外部変数の型推論 (caml2html: typing_extvar) *)
         Format.eprintf "free variable %s assumed as external@." x;
         let t = Type.gentyp () in
         extenv := M.add x t !extenv;
         t
-    | LetRec({ name = (x, t::_); args = ytss; body = e1::_ }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
-        let yts = List.map (fun (x, t::_) -> (x, t)) ytss in
-        let env = M.add x t env in
-        unify t (Type.Fun(List.map snd yts, g (M.add_list yts env) e1));
-        g env e2
+    | LetRec({ name = (x, ts); args = ytss; body = e1s }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
+        let argkeys = List.map (fun x -> (fst x, 0)) ytss in
+        let argtypes = transpose (List.map snd ytss) in
+        List.iter2 (fun t (yts, e1) ->
+          let env = Vm.add (x, 0) t env in
+          unify t (Type.Fun(yts, g (Vm.add_list2 argkeys yts env) e1))
+        ) ts (zip argtypes e1s);
+        g (Vm.add_v x ts env) e2
     | App(e, es) -> (* 関数適用の型推論 (caml2html: typing_app) *)
         let t = Type.gentyp () in
         unify (g env e) (Type.Fun(List.map (g env) es, t));
         t
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
-    | LetTuple(xtss, e1::_, e2) ->
-        let xts = List.map (fun (x, t::_) -> (x, t)) xtss in
-        unify (Type.Tuple(List.map snd xts)) (g env e1);
-        g (M.add_list xts env) e2
+    | LetTuple(xtss, e1s, e2) ->
+        List.iter2 (fun xts e1 -> unify (Type.Tuple(xts)) (g env e1)) (transpose (List.map snd xtss)) e1s;
+        g (List.fold_left (fun env (x, ts) -> Vm.add_v x ts env) env xtss) e2
     | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
         unify (g env e1) Type.Int;
         Type.Array(g env e2)
@@ -163,11 +171,13 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t = g env e1 in
         unify (Type.List(t)) (g env e2);
         Type.List(t)
-    | Match(e1::_, e2, (x, tx::_), (y, ty::_), e3) ->
-        unify (Type.List(tx)) ty;
-        unify (g env e1) ty;
+    | Match(e1s, e2, (x, txs), (y, tys), e3) ->
+        List.iter2 (fun e1 (tx, ty) ->
+          unify (Type.List(tx)) ty;
+          unify (g env e1) ty
+        ) e1s (zip txs tys);
         let t2 = g env e2 in
-        let t3 = g (M.add_list [(x, tx); (y, ty)] env) e3 in
+        let t3 = g (Vm.add_v y tys (Vm.add_v x txs env)) e3 in
         unify t2 t3;
         t2
   with Unify(t1, t2) -> raise (Error(deref_term e, deref_typ t1, deref_typ t2))
@@ -179,7 +189,7 @@ let f e =
   | Type.Unit -> ()
   | _ -> Format.eprintf "warning: final result does not have type unit@.");
 *)
-  (try unify Type.Unit (g M.empty e)
+  (try unify Type.Unit (g Vm.empty e)
   with Unify _ -> failwith "top level does not have type unit");
   extenv := M.map deref_typ !extenv;
   deref_term e
