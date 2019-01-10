@@ -109,21 +109,22 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
               let e4', t4 = g env e4 in
               IfLE(x, y, e3', e4'), t3))
   | Syntax.If(e1, e2, e3) -> g env (Syntax.If(Syntax.Eq(e1, Syntax.Bool(false)), e3, e2)) (* 比較のない分岐を変換 (caml2html: knormal_if) *)
-  | Syntax.Let((x, t), e1, e2) ->
+  | Syntax.Let((x, t::_), e1::_, e2) ->
       let e1', t1 = g env e1 in
       let e2', t2 = g (M.add x t env) e2 in
       Let((x, t), e1', e2'), t2
-  | Syntax.Var(x) when M.mem x env -> Var(x), M.find x env
-  | Syntax.Var(x) -> (* 外部配列の参照 (caml2html: knormal_extarray) *)
+  | Syntax.Var(x, _) when M.mem x env -> Var(x), M.find x env
+  | Syntax.Var(x, _) -> (* 外部配列の参照 (caml2html: knormal_extarray) *)
       (match M.find x !Typing.extenv with
       | Type.Array(_) as t -> ExtArray x, t
       | _ -> failwith (Printf.sprintf "external variable %s does not have an array type" x))
-  | Syntax.LetRec({ Syntax.name = (x, t); Syntax.args = yts; Syntax.body = e1 }, e2) ->
+  | Syntax.LetRec({ Syntax.name = (x, t::_); Syntax.args = ytss; Syntax.body = e1::_ }, e2) ->
+      let yts = List.map (fun (x, t::_) -> (x, t)) ytss in
       let env' = M.add x t env in
       let e2', t2 = g env' e2 in
       let e1', t1 = g (M.add_list yts env') e1 in
       LetRec({ name = (x, t); args = yts; body = e1' }, e2'), t2
-  | Syntax.App(Syntax.Var(f), e2s) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
+  | Syntax.App(Syntax.Var(f, _), e2s) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
           let rec bind xs = function (* "xs" are identifiers for the arguments *)
@@ -153,7 +154,8 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
             insert_let g_e
               (fun x -> bind (xs @ [x]) (ts @ [t]) es) in
       bind [] [] es
-  | Syntax.LetTuple(xts, e1, e2) ->
+  | Syntax.LetTuple(xtss, e1::_, e2) ->
+      let xts = List.map (fun (x, t::_) -> (x, t)) xtss in
       insert_let (g env e1)
         (fun y ->
           let e2', t2 = g (M.add_list xts env) e2 in
@@ -193,11 +195,11 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       insert_let g_e1
         (fun x -> insert_let (g env e2)
             (fun y -> LAdd(x, y), Type.List(t1)))
-  | Syntax.Match(e1, e2, xt, yt, e3) ->
+  | Syntax.Match(e1::_, e2, (x, tx::_), (y, ty::_), e3) ->
       insert_let (g env e1)
-        (fun x ->
+        (fun z ->
           let e2', t2 = g env e2 in
-          let e3', t3 = g (M.add_list [xt; yt] env) e3 in
-          Match(x, e2', xt, yt, e3'), t2)
+          let e3', t3 = g (M.add_list [(x, tx); (y, ty)] env) e3 in
+          Match(z, e2', (x, tx), (y, ty), e3'), t2)
 
 let f e = fst (g M.empty e)

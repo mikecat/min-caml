@@ -2,6 +2,7 @@
 (* parserが利用する変数、関数、型などの定義 *)
 open Syntax
 let addtyp x = (x, Type.gentyp ())
+let addtypl x = (x, [Type.gentyp ()])
 %}
 
 /* (* 字句を表すデータ型の定義 (caml2html: parser_token) *) */
@@ -78,7 +79,7 @@ simple_exp: /* (* 括弧をつけなくても関数の引数になれる式 (caml2html: parser_simp
 | FLOAT
     { Float($1) }
 | IDENT
-    { Var($1) }
+    { Var($1, 0) }
 | simple_exp DOT LPAREN exp RPAREN
     { Get($1, $4) }
 | LBRACKET RBRACKET
@@ -86,7 +87,7 @@ simple_exp: /* (* 括弧をつけなくても関数の引数になれる式 (caml2html: parser_simp
 | LBRACKET exp RBRACKET
     { let rec convert_list node data =
         match node with
-          Let((_, Type.Unit), x, xs) -> convert_list xs (x :: data)
+          Let((_, [Type.Unit]), [x], xs) -> convert_list xs (x :: data)
         | _ -> (node :: data)
       in List(List.rev (convert_list $2 [])) }
 
@@ -133,7 +134,7 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
     { FDiv($1, $3) }
 | LET IDENT EQUAL exp IN exp
     %prec prec_let
-    { Let(addtyp $2, $4, $6) }
+    { Let(addtypl $2, [$4], $6) }
 | LET REC fundef IN exp
     %prec prec_let
     { LetRec($3, $5) }
@@ -147,13 +148,13 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
     { LAdd($1, $3) }
 | MATCH exp WITH LBRACKET RBRACKET MINUS_GREATER exp OR IDENT COLON_COLON IDENT MINUS_GREATER exp
     %prec prec_let
-    { Match($2, $7, addtyp $9, addtyp $11, $13) }
+    { Match([$2], $7, addtypl $9, addtypl $11, $13) }
 | LET LPAREN pat RPAREN EQUAL exp IN exp
-    { LetTuple($3, $6, $8) }
+    { LetTuple($3, [$6], $8) }
 | simple_exp DOT LPAREN exp RPAREN LESS_MINUS exp
     { Put($1, $4, $7) }
 | exp SEMICOLON exp
-    { Let((Id.gentmp Type.Unit, Type.Unit), $1, $3) }
+    { Let((Id.gentmp Type.Unit, [Type.Unit]), [$1], $3) }
 | ARRAY_CREATE simple_exp simple_exp
     %prec prec_app
     { Array($2, $3) }
@@ -165,13 +166,13 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 
 fundef:
 | IDENT formal_args EQUAL exp
-    { { name = addtyp $1; args = $2; body = $4 } }
+    { { name = addtypl $1; args = $2; body = [$4] } }
 
 formal_args:
 | IDENT formal_args
-    { addtyp $1 :: $2 }
+    { addtypl $1 :: $2 }
 | IDENT
-    { [addtyp $1] }
+    { [addtypl $1] }
 
 actual_args:
 | actual_args simple_exp
@@ -189,6 +190,6 @@ elems:
 
 pat:
 | pat COMMA IDENT
-    { $1 @ [addtyp $3] }
+    { $1 @ [addtypl $3] }
 | IDENT COMMA IDENT
-    { [addtyp $1; addtyp $3] }
+    { [addtypl $1; addtypl $3] }

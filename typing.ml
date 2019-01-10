@@ -23,6 +23,7 @@ let rec deref_typ = function (* 型変数を中身でおきかえる関数 (caml2html: typing_
       t'
   | t -> t
 let rec deref_id_typ (x, t) = (x, deref_typ t)
+let rec deref_id_typl (x, t) = (x, List.map deref_typ t)
 let rec deref_term = function
   | Not(e) -> Not(deref_term e)
   | Neg(e) -> Neg(deref_term e)
@@ -36,21 +37,21 @@ let rec deref_term = function
   | FMul(e1, e2) -> FMul(deref_term e1, deref_term e2)
   | FDiv(e1, e2) -> FDiv(deref_term e1, deref_term e2)
   | If(e1, e2, e3) -> If(deref_term e1, deref_term e2, deref_term e3)
-  | Let(xt, e1, e2) -> Let(deref_id_typ xt, deref_term e1, deref_term e2)
-  | LetRec({ name = xt; args = yts; body = e1 }, e2) ->
-      LetRec({ name = deref_id_typ xt;
-               args = List.map deref_id_typ yts;
-               body = deref_term e1 },
+  | Let(xt, e1, e2) -> Let(deref_id_typl xt, List.map deref_term e1, deref_term e2)
+  | LetRec({ name = xt; args = yts; body = e1s }, e2) ->
+      LetRec({ name = deref_id_typl xt;
+               args = List.map deref_id_typl yts;
+               body = List.map deref_term e1s },
              deref_term e2)
   | App(e, es) -> App(deref_term e, List.map deref_term es)
   | Tuple(es) -> Tuple(List.map deref_term es)
-  | LetTuple(xts, e1, e2) -> LetTuple(List.map deref_id_typ xts, deref_term e1, deref_term e2)
+  | LetTuple(xts, e1, e2) -> LetTuple(List.map deref_id_typl xts, List.map deref_term e1, deref_term e2)
   | Array(e1, e2) -> Array(deref_term e1, deref_term e2)
   | Get(e1, e2) -> Get(deref_term e1, deref_term e2)
   | Put(e1, e2, e3) -> Put(deref_term e1, deref_term e2, deref_term e3)
   | List(e) -> List(List.map deref_term e)
   | LAdd(e1, e2) -> LAdd(deref_term e1, deref_term e2)
-  | Match(e1, e2, xt, yt, e3) -> Match(deref_term e1, deref_term e2, deref_id_typ xt, deref_id_typ yt, deref_term e3)
+  | Match(e1, e2, xt, yt, e3) -> Match(List.map deref_term e1, deref_term e2, deref_id_typl xt, deref_id_typl yt, deref_term e3)
   | e -> e
 
 let rec occur r1 = function (* occur check (caml2html: typing_occur) *)
@@ -117,17 +118,18 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t3 = g env e3 in
         unify t2 t3;
         t2
-    | Let((x, t), e1, e2) -> (* letの型推論 (caml2html: typing_let) *)
+    | Let((x, t::_), e1::_, e2) -> (* letの型推論 (caml2html: typing_let) *)
         unify t (g env e1);
         g (M.add x t env) e2
-    | Var(x) when M.mem x env -> M.find x env (* 変数の型推論 (caml2html: typing_var) *)
-    | Var(x) when M.mem x !extenv -> M.find x !extenv
-    | Var(x) -> (* 外部変数の型推論 (caml2html: typing_extvar) *)
+    | Var(x, _) when M.mem x env -> M.find x env (* 変数の型推論 (caml2html: typing_var) *)
+    | Var(x, _) when M.mem x !extenv -> M.find x !extenv
+    | Var(x, _) -> (* 外部変数の型推論 (caml2html: typing_extvar) *)
         Format.eprintf "free variable %s assumed as external@." x;
         let t = Type.gentyp () in
         extenv := M.add x t !extenv;
         t
-    | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
+    | LetRec({ name = (x, t::_); args = ytss; body = e1::_ }, e2) -> (* let recの型推論 (caml2html: typing_letrec) *)
+        let yts = List.map (fun (x, t::_) -> (x, t)) ytss in
         let env = M.add x t env in
         unify t (Type.Fun(List.map snd yts, g (M.add_list yts env) e1));
         g env e2
@@ -136,7 +138,8 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         unify (g env e) (Type.Fun(List.map (g env) es, t));
         t
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
-    | LetTuple(xts, e1, e2) ->
+    | LetTuple(xtss, e1::_, e2) ->
+        let xts = List.map (fun (x, t::_) -> (x, t)) xtss in
         unify (Type.Tuple(List.map snd xts)) (g env e1);
         g (M.add_list xts env) e2
     | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
@@ -160,7 +163,7 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
         let t = g env e1 in
         unify (Type.List(t)) (g env e2);
         Type.List(t)
-    | Match(e1, e2, (x, tx), (y, ty), e3) ->
+    | Match(e1::_, e2, (x, tx::_), (y, ty::_), e3) ->
         unify (Type.List(tx)) ty;
         unify (g env e1) ty;
         let t2 = g env e2 in
