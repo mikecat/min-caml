@@ -13,51 +13,6 @@ let rec copy_type t = match t with
   | Type.Var({ contents = None }) -> Type.Var(ref None)
   | Type.Var({ contents = Some(t) }) -> Type.Var(ref (Some(copy_type t)))
 
-let rec copy_ast e = match e with
-    Unit -> Unit
-  | Bool(v) -> Bool(v)
-  | Int(v) -> Int(v)
-  | Float(v) -> Float(v)
-  | Not(e) -> Not(copy_ast e)
-  | Neg(e) -> Neg(copy_ast e)
-  | Add(e1, e2) -> Add(copy_ast e1, copy_ast e2)
-  | Sub(e1, e2) -> Sub(copy_ast e1, copy_ast e2)
-  | FNeg(e) -> FNeg(copy_ast e)
-  | FAdd(e1, e2) -> FAdd(copy_ast e1, copy_ast e2)
-  | FSub(e1, e2) -> FSub(copy_ast e1, copy_ast e2)
-  | FMul(e1, e2) -> FMul(copy_ast e1, copy_ast e2)
-  | FDiv(e1, e2) -> FDiv(copy_ast e1, copy_ast e2)
-  | Eq(e1, e2) -> Eq(copy_ast e1, copy_ast e2)
-  | LE(e1, e2) -> LE(copy_ast e1, copy_ast e2)
-  | If(e1, e2, e3) -> If(copy_ast e1, copy_ast e2, copy_ast e3)
-  | Let((x, xts), e1s, e2) -> Let((x, List.map copy_type xts), List.map copy_ast e1s, copy_ast e2)
-  | Var(x, n) -> Var(x, n)
-  | LetRec({ name = (x, xts); args = ytss; body = e1s }, e2) ->
-      LetRec({name = (x, List.map copy_type xts);
-              args = List.map (fun (x, xts) -> (x, List.map copy_type xts)) ytss;
-              body = List.map copy_ast e1s }, 
-             copy_ast e2)
-  | App(e1, e2s) -> App(copy_ast e1, List.map copy_ast e2s)
-  | Tuple(es) -> Tuple(List.map copy_ast es)
-  | LetTuple(xtss, e1s, e2) ->
-      LetTuple(List.map (fun (x, xts) -> (x, List.map copy_type xts)) xtss,
-               List.map copy_ast e1s,
-               copy_ast e2)
-  | Array(e1, e2) -> Array(copy_ast e1, copy_ast e2)
-  | Get(e1, e2) -> Get(copy_ast e1, copy_ast e2)
-  | Put(e1, e2, e3) -> Put(copy_ast e1, copy_ast e2, copy_ast e3)
-  | List(es) -> List(List.map copy_ast es)
-  | LAdd(e1, e2) -> LAdd(copy_ast e1, copy_ast e2)
-  | Match(e1s, e2, (x, xts), (y, yts), e3) ->
-      Match(List.map copy_ast e1s, copy_ast e2, (x, List.map copy_type xts),
-            (y, List.map copy_type yts), copy_ast e3)
-
-let rec copy_ast_n n e =
-  let rec cani n ret =
-    if n <= 1 then (copy_ast e) :: ret
-              else cani (n - 1) ((copy_ast e) :: ret)
-  in cani n []
-
 let rec copy_type_n n t =
   let rec ctni n ret =
     if n <= 1 then (copy_type t) :: ret
