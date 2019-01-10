@@ -211,7 +211,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       insert_let (g env e1)
         (fun z ->
           let e2', t2 = g env e2 in
-          let e3', t3 = g (Vm.add_v y tys (Vm.add_v x txs env)) e3 in
+          let e3', t3 = g (Vm.add_list_v [(x, txs); (y, tys)] env) e3 in
           Match(z, e2', (x, List.hd txs), (y, List.hd tys), e3'), t2)
 
 let f e = fst (g Vm.empty e)

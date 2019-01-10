@@ -149,7 +149,7 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
     | LetTuple(xtss, e1s, e2) ->
         List.iter2 (fun xts e1 -> unify (Type.Tuple(xts)) (g env e1)) (transpose (List.map snd xtss)) e1s;
-        g (List.fold_left (fun env (x, ts) -> Vm.add_v x ts env) env xtss) e2
+        g (Vm.add_list_v xtss env) e2
     | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
         unify (g env e1) Type.Int;
         Type.Array(g env e2)
@@ -177,7 +177,7 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
           unify (g env e1) ty
         ) e1s (zip txs tys);
         let t2 = g env e2 in
-        let t3 = g (Vm.add_v y tys (Vm.add_v x txs env)) e3 in
+        let t3 = g (Vm.add_list_v [(x, txs); (y,tys)] env) e3 in
         unify t2 t3;
         t2
   with Unify(t1, t2) -> raise (Error(deref_term e, deref_typ t1, deref_typ t2))

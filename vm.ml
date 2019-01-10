@@ -14,3 +14,4 @@ let add_v x ys env =
   fst (List.fold_left
     (fun (env, no) y -> (add (x, no) y env, no + 1))
     (env, 0) ys)
+let add_list_v xyss env = List.fold_left (fun env (x, ys) -> add_v x ys env) env xyss
