@@ -27,5 +27,8 @@ type t =
   | Match of Id.t * t * (Id.t * Type.t) * (Id.t * Type.t) * t
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
+val funcTypeCnt : int ref
+val funcTypeId : Type.t -> int
+
 val fv : t -> S.t
 val f : Syntax.t -> t

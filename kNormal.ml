@@ -1,5 +1,16 @@
 (* give names to intermediate values (K-normalization) *)
 
+module Tm =
+  Map.Make
+    (struct
+      type t = Type.t
+      let compare = compare
+    end)
+
+let funcTypeCnt = ref 0
+let funcTypeMap = ref Tm.empty
+let funcTypeId t = Tm.find t !funcTypeMap
+
 type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | Unit
   | Int of int
@@ -132,6 +143,8 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       let defs' = List.map2 (fun t (yts, e1) ->
         let env = Vm.add (x, 0) t env in
         let e1', _ = g (Vm.add_list2 argkeys yts env) e1 in
+        if not (Tm.mem t !funcTypeMap)
+          then (funcTypeMap := Tm.add t !funcTypeCnt !funcTypeMap; funcTypeCnt := !funcTypeCnt + 1);
         { name = (x, t); args = zip argnames yts; body = e1' }
       ) ts (zip argtypes e1s) in
       let env' = Vm.add_v x ts env in
@@ -149,7 +162,9 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       | _ -> assert false)
   | Syntax.App(e1, e2s) ->
       (match g env e1 with
-      | _, Type.Fun(_, t) as g_e1 ->
+      | _, (Type.Fun(_, t) as ft) as g_e1 ->
+          if not (Tm.mem ft !funcTypeMap)
+            then (funcTypeMap := Tm.add ft !funcTypeCnt !funcTypeMap; funcTypeCnt := !funcTypeCnt + 1);
           insert_let g_e1
             (fun f ->
               let rec bind xs = function (* "xs" are identifiers for the arguments *)
@@ -214,4 +229,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
           let e3', t3 = g (Vm.add_list_v [(x, txs); (y, tys)] env) e3 in
           Match(z, e2', (x, List.hd txs), (y, List.hd tys), e3'), t2)
 
-let f e = fst (g Vm.empty e)
+let f e = 
+  funcTypeCnt := 0;
+  funcTypeMap := Tm.empty;
+  fst (g Vm.empty e)
