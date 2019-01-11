@@ -130,9 +130,13 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
         let env = M.add x t env in
         let e1', _ = g (M.add_list yts env) e1 in
         { name = (x, t); args = yts; body = e1' }) defs in
+      let isnew = Array.make !Merge.func_type_cnt true in
+      let defs_f = List.filter (fun x -> let id = Merge.func_type_id (snd x.name) in
+                                         let ret = isnew.(id) in
+                                         isnew.(id) <- false; ret) defs' in
       let env' = M.add x t env in
       let e2', t2 = g env' e2 in
-      LetRec((x, t), defs', e2'), t2
+      LetRec((x, t), defs_f, e2'), t2
   | Syntax.App(Syntax.Var(f, _), e2s, _) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
