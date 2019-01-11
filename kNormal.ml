@@ -1,16 +1,5 @@
 (* give names to intermediate values (K-normalization) *)
 
-module Tm =
-  Map.Make
-    (struct
-      type t = Type.t
-      let compare = compare
-    end)
-
-let funcTypeCnt = ref 0
-let funcTypeMap = ref Tm.empty
-let funcTypeId t = Tm.find t !funcTypeMap
-
 type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | Unit
   | Int of int
@@ -127,26 +116,24 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
               let e4', t4 = g env e4 in
               IfLE(x, y, e3', e4'), t3))
   | Syntax.If(e1, e2, e3) -> g env (Syntax.If(Syntax.Eq(e1, Syntax.Bool(false)), e3, e2)) (* 比較のない分岐を変換 (caml2html: knormal_if) *)
-  | Syntax.Let((x, ts), e1::_, e2) ->
+  | Syntax.Let((x, [t]), [e1], e2) ->
       let e1', t1 = g env e1 in
-      let e2', t2 = g (Vm.add_v x ts env) e2 in
-      Let((x, List.hd ts), e1', e2'), t2
-  | Syntax.Var(x, n) when Vm.mem (x, n) env -> Var(x), Vm.find (x, n) env
+      let e2', t2 = g (M.add x t env) e2 in
+      Let((x, t), e1', e2'), t2
+  | Syntax.Var(x, _) when M.mem x env -> Var(x), M.find x env
   | Syntax.Var(x, _) -> (* 外部配列の参照 (caml2html: knormal_extarray) *)
       (match M.find x !Typing.extenv with
       | Type.Array(_) as t -> ExtArray x, t
       | _ -> failwith (Printf.sprintf "external variable %s does not have an array type" x))
-  | Syntax.LetRec((x, ts), defs, e2) ->
+  | Syntax.LetRec((x, [t]), defs, e2) ->
       let defs' = List.map (fun { Syntax.name = (x, t); Syntax.args = yts; Syntax.body = e1 } ->
-        let env = Vm.add (x, 0) t env in
-        let e1', _ = g (Vm.add_list (List.map (fun (y, t) -> ((y, 0), t)) yts) env) e1 in
-        if not (Tm.mem t !funcTypeMap)
-          then (funcTypeMap := Tm.add t !funcTypeCnt !funcTypeMap; funcTypeCnt := !funcTypeCnt + 1);
+        let env = M.add x t env in
+        let e1', _ = g (M.add_list yts env) e1 in
         { name = (x, t); args = yts; body = e1' }) defs in
-      let env' = Vm.add_v x ts env in
+      let env' = M.add x t env in
       let e2', t2 = g env' e2 in
       LetRec(defs', e2'), t2
-  | Syntax.App(Syntax.Var(f, n), e2s, _) when not (Vm.mem (f, n) env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
+  | Syntax.App(Syntax.Var(f, _), e2s, _) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
           let rec bind xs = function (* "xs" are identifiers for the arguments *)
@@ -159,8 +146,6 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
   | Syntax.App(e1, e2s, _) ->
       (match g env e1 with
       | _, (Type.Fun(_, t) as ft) as g_e1 ->
-          if not (Tm.mem ft !funcTypeMap)
-            then (funcTypeMap := Tm.add ft !funcTypeCnt !funcTypeMap; funcTypeCnt := !funcTypeCnt + 1);
           insert_let g_e1
             (fun f ->
               let rec bind xs = function (* "xs" are identifiers for the arguments *)
@@ -178,11 +163,12 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
             insert_let g_e
               (fun x -> bind (xs @ [x]) (ts @ [t]) es) in
       bind [] [] es
-  | Syntax.LetTuple(xtss, e1::_, e2) ->
+  | Syntax.LetTuple(xtss, [e1], e2) ->
+      let xts = List.map (fun (x, ts) -> (x, List.hd ts)) xtss in
       insert_let (g env e1)
         (fun y ->
-          let e2', t2 = g (List.fold_left (fun env (x, ts) -> Vm.add_v x ts env) env xtss) e2 in
-          LetTuple(List.map (fun (x, ts) -> (x, List.hd ts)) xtss, y, e2'), t2)
+          let e2', t2 = g (M.add_list xts env) e2 in
+          LetTuple(xts, y, e2'), t2)
   | Syntax.Array(e1, e2) ->
       insert_let (g env e1)
         (fun x ->
@@ -218,14 +204,12 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       insert_let g_e1
         (fun x -> insert_let (g env e2)
             (fun y -> LAdd(x, y), Type.List(t1)))
-  | Syntax.Match(e1::_, e2, (x, txs), (y, tys), e3) ->
+  | Syntax.Match([e1], e2, (x, [xt]), (y, [yt]), e3) ->
       insert_let (g env e1)
         (fun z ->
           let e2', t2 = g env e2 in
-          let e3', t3 = g (Vm.add_list_v [(x, txs); (y, tys)] env) e3 in
-          Match(z, e2', (x, List.hd txs), (y, List.hd tys), e3'), t2)
+          let e3', t3 = g (M.add_list [(x, xt); (y, yt)] env) e3 in
+          Match(z, e2', (x, xt), (y, yt), e3'), t2)
+  | _ -> assert false (* suppress warnings *)
 
-let f e = 
-  funcTypeCnt := 0;
-  funcTypeMap := Tm.empty;
-  fst (g Vm.empty e)
+let f e = fst (g M.empty e)
