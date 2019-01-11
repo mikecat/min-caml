@@ -32,7 +32,7 @@ let rec g env = function (* β簡約ルーチン本体 (caml2html: beta_g) *)
   | LetTuple(xts, y, e) -> LetTuple(xts, find y env, g env e)
   | Get(x, y) -> Get(find x env, find y env)
   | Put(x, y, z) -> Put(find x env, find y env, find z env)
-  | App(g, xs) -> App(find g env, List.map (fun x -> find x env) xs)
+  | App(g, xs, n) -> App(find g env, List.map (fun x -> find x env) xs, n)
   | ExtArray(x) -> ExtArray(x)
   | ExtFunApp(x, ys) -> ExtFunApp(x, List.map (fun y -> find y env) ys)
   | EmptyList -> EmptyList

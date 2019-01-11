@@ -17,7 +17,7 @@ type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | Let of (Id.t * Type.t) * t * t
   | Var of Id.t
   | LetRec of fundef list * t
-  | App of Id.t * Id.t list
+  | App of Id.t * Id.t list * int
   | Tuple of Id.t list
   | LetTuple of (Id.t * Type.t) list * Id.t * t
   | Get of Id.t * Id.t
@@ -40,7 +40,7 @@ let rec fv = function (* 式に出現する（自由な）変数 (caml2html: knormal_fv) *)
       let { name = (x, t); args = yts; body = e1 } = List.hd defs in
       let zs = S.diff (fv e1) (S.of_list (List.map fst yts)) in
       S.diff (S.union zs (fv e2)) (S.singleton x)
-  | App(x, ys) -> S.of_list (x :: ys)
+  | App(x, ys, _) -> S.of_list (x :: ys)
   | Tuple(xs) | ExtFunApp(_, xs) -> S.of_list xs
   | Put(x, y, z) -> S.of_list [x; y; z]
   | LetTuple(xs, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xs)))
@@ -143,17 +143,20 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
                   (fun x -> bind (xs @ [x]) e2s) in
           bind [] e2s (* left-to-right evaluation *)
       | _ -> assert false)
-  | Syntax.App(e1, e2s, _) ->
-      (match g env e1 with
-      | _, (Type.Fun(_, t) as ft) as g_e1 ->
-          insert_let g_e1
-            (fun f ->
-              let rec bind xs = function (* "xs" are identifiers for the arguments *)
-                | [] -> App(f, xs), t
-                | e2 :: e2s ->
-                    insert_let (g env e2)
-                      (fun x -> bind (xs @ [x]) e2s) in
-              bind [] e2s) (* left-to-right evaluation *)
+  | Syntax.App(e1, e2s, aft) ->
+      (match aft with
+      | Type.Fun(_, afr) ->
+        (match g env e1 with
+        | _, (Type.Fun(_, _) as ft) as g_e1 ->
+            insert_let g_e1
+              (fun f ->
+                let rec bind xs = function (* "xs" are identifiers for the arguments *)
+                  | [] -> App(f, xs, Merge.func_type_id aft), afr
+                  | e2 :: e2s ->
+                      insert_let (g env e2)
+                        (fun x -> bind (xs @ [x]) e2s) in
+                bind [] e2s) (* left-to-right evaluation *)
+        | _ -> assert false)
       | _ -> assert false)
   | Syntax.Tuple(es) ->
       let rec bind xs ts = function (* "xs" and "ts" are identifiers and types for the elements *)

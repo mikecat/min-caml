@@ -18,7 +18,7 @@ let rec g env = function (* インライン展開ルーチン本体 (caml2html: inline_g) *)
       let env = if size e1 > !threshold then env else M.add x (yts, e1) env in (* TODO: 先頭以外も処理する *)
       LetRec(List.map (fun { name = (x, t); args = yts; body = e1 } ->
                            { name = (x, t); args = yts; body = g env e1}) defs, g env e2)
-  | App(x, ys) when M.mem x env -> (* 関数適用の場合 (caml2html: inline_app) *)
+  | App(x, ys, _) when M.mem x env -> (* 関数適用の場合 (caml2html: inline_app) *)
       let (zs, e) = M.find x env in
       Format.eprintf "inlining %s@." x;
       let env' =

@@ -15,7 +15,7 @@ type t =
   | Let of (Id.t * Type.t) * t * t
   | Var of Id.t
   | LetRec of fundef list * t
-  | App of Id.t * Id.t list
+  | App of Id.t * Id.t list * int
   | Tuple of Id.t list
   | LetTuple of (Id.t * Type.t) list * Id.t * t
   | Get of Id.t * Id.t
