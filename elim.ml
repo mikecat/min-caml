@@ -2,7 +2,7 @@ open KNormal
 
 let rec effect = function (* 副作用の有無 (caml2html: elim_effect) *)
   | Let(_, e1, e2) | IfEq(_, _, e1, e2) | IfLE(_, _, e1, e2) | Match(_, e1, _, _, e2) -> effect e1 || effect e2
-  | LetRec(_, e) | LetTuple(_, _, e) -> effect e
+  | LetRec(_, _, e) | LetTuple(_, _, e) -> effect e
   | App _ | Put _ | ExtFunApp _ -> true
   | _ -> false
 
@@ -15,12 +15,11 @@ let rec f = function (* 不要定義削除ルーチン本体 (caml2html: elim_f) *)
       if effect e1' || S.mem x (fv e2') then Let((x, t), e1', e2') else
       (Format.eprintf "eliminating variable %s@." x;
        e2')
-  | LetRec(defs, e2) -> (* let recの場合 (caml2html: elim_letrec) *)
+  | LetRec((x, t), defs, e2) -> (* let recの場合 (caml2html: elim_letrec) *)
       let e2' = f e2 in
-      let { name = (x, t); args = yts; body = e1 } = List.hd defs in
       if S.mem x (fv e2') then
-        LetRec(List.map (fun { name = (x, t); args = yts; body = e1 } ->
-                             { name = (x, t); args = yts; body = f e1 }) defs, e2')
+        LetRec((x, t), List.map (fun { name = xt; args = yts; body = e1 } ->
+                                     { name = xt; args = yts; body = f e1 }) defs, e2')
       else
         (Format.eprintf "eliminating function %s@." x;
          e2')

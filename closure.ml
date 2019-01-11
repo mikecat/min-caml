@@ -64,7 +64,7 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure
   | KNormal.IfLE(x, y, e1, e2) -> IfLE(x, y, g env known e1, g env known e2)
   | KNormal.Let((x, t), e1, e2) -> Let((x, t), g env known e1, g (M.add x t env) known e2)
   | KNormal.Var(x) -> Var(x)
-  | KNormal.LetRec({ KNormal.name = (x, t); KNormal.args = yts; KNormal.body = e1 }::_, e2) -> (* 関数定義の場合 (caml2html: closure_letrec) *)
+  | KNormal.LetRec(_, { KNormal.name = (x, t); KNormal.args = yts; KNormal.body = e1 }::_, e2) -> (* 関数定義の場合 (caml2html: closure_letrec) *)
       (* 関数定義let rec x y1 ... yn = e1 in e2の場合は、
          xに自由変数がない(closureを介さずdirectに呼び出せる)
          と仮定し、knownに追加してe1をクロージャ変換してみる *)

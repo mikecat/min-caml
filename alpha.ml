@@ -22,12 +22,12 @@ let rec g env = function (* α変換ルーチン本体 (caml2html: alpha_g) *)
       let x' = Id.genid x in
       Let((x', t), g env e1, g (M.add x x' env) e2)
   | Var(x) -> Var(find x env)
-  | LetRec(defs, e2) -> (* let recのα変換 (caml2html: alpha_letrec) *)
-      let { name = (x, t); args = yts; body = e1 } = List.hd defs in
+  | LetRec((x, t), defs, e2) -> (* let recのα変換 (caml2html: alpha_letrec) *)
       let env = M.add x (Id.genid x) env in
+      let { name = (x, t); args = yts; body = e1 } = List.hd defs in
       let ys = List.map fst yts in
       let env' = M.add_list2 ys (List.map Id.genid ys) env in
-      LetRec(List.map (fun { name = (x, t); args = yts; body = e1 } ->
+      LetRec((find x env, t), List.map (fun { name = (x, t); args = yts; body = e1 } ->
              { name = (find x env, t);
                args = List.map (fun (y, t) -> (find y env', t)) yts;
                body = g env' e1 }) defs,

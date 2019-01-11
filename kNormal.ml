@@ -16,7 +16,7 @@ type t = (* K正規化後の式 (caml2html: knormal_t) *)
   | IfLE of Id.t * Id.t * t * t (* 比較 + 分岐 *)
   | Let of (Id.t * Type.t) * t * t
   | Var of Id.t
-  | LetRec of fundef list * t
+  | LetRec of (Id.t * Type.t) * fundef list * t
   | App of Id.t * Id.t list * int
   | Tuple of Id.t list
   | LetTuple of (Id.t * Type.t) list * Id.t * t
@@ -36,8 +36,8 @@ let rec fv = function (* 式に出現する（自由な）変数 (caml2html: knormal_fv) *)
   | IfEq(x, y, e1, e2) | IfLE(x, y, e1, e2) -> S.add x (S.add y (S.union (fv e1) (fv e2)))
   | Let((x, t), e1, e2) -> S.union (fv e1) (S.remove x (fv e2))
   | Var(x) -> S.singleton x
-  | LetRec(defs, e2) ->
-      let { name = (x, t); args = yts; body = e1 } = List.hd defs in
+  | LetRec((x, t), defs, e2) ->
+      let { name = _; args = yts; body = e1 } = List.hd defs in
       let zs = S.diff (fv e1) (S.of_list (List.map fst yts)) in
       S.diff (S.union zs (fv e2)) (S.singleton x)
   | App(x, ys, _) -> S.of_list (x :: ys)
@@ -132,7 +132,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
         { name = (x, t); args = yts; body = e1' }) defs in
       let env' = M.add x t env in
       let e2', t2 = g env' e2 in
-      LetRec(defs', e2'), t2
+      LetRec((x, t), defs', e2'), t2
   | Syntax.App(Syntax.Var(f, _), e2s, _) when not (M.mem f env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
