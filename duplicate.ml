@@ -12,6 +12,7 @@ let rec copy_type t = match t with
   | Type.List(t) -> Type.List(copy_type t)
   | Type.Var({ contents = None }) -> Type.Var(ref None)
   | Type.Var({ contents = Some(t) }) -> Type.Var(ref (Some(copy_type t)))
+  | Type.Multi -> Type.Multi
 
 let rec copy_type_n n t =
   let rec ctni n ret =
@@ -62,7 +63,7 @@ let rec g env e = match e with
   | LetTuple(xtss, [e1], e2) ->
       let cnt = ref 0 in
       let e2' = g (M.add_list (List.map (fun (x, _) -> (x, cnt)) xtss) env) e2 in
-      LetTuple(List.map (fun (x, [xt]) -> (x, copy_type_n !cnt xt)) xtss, gn !cnt env e1, e2')
+      LetTuple(List.map (fun (x, xts) -> (x, copy_type_n !cnt (List.hd xts))) xtss, gn !cnt env e1, e2')
   | Array(e1, e2) -> Array(g env e1, g env e2)
   | Get(e1, e2) -> Get(g env e1, g env e2)
   | Put(e1, e2, e3) -> Put(g env e1, g env e2, g env e3)
