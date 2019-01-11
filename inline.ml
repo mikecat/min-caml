@@ -14,12 +14,12 @@ let rec g env = function (* インライン展開ルーチン本体 (caml2html: inline_g) *)
   | IfLE(x, y, e1, e2) -> IfLE(x, y, g env e1, g env e2)
   | Let(xt, e1, e2) -> Let(xt, g env e1, g env e2)
   | LetRec(xt, defs, e2) -> (* 関数定義の場合 (caml2html: inline_letrec) *)
-      let { name = (x, t); args = yts; body = e1 } = List.hd defs in
-      let env = if size e1 > !threshold then env else M.add x (yts, e1) env in (* TODO: 先頭以外も処理する *)
-      LetRec(xt, List.map (fun { name = (x, t); args = yts; body = e1 } ->
-                               { name = (x, t); args = yts; body = g env e1}) defs, g env e2)
-  | App(x, ys, _) when M.mem x env -> (* 関数適用の場合 (caml2html: inline_app) *)
-      let (zs, e) = M.find x env in
+      let env = List.fold_left (fun env { name = (x, t); args = yts; body = e1 } ->
+        if size e1 > !threshold then env else Vm.add (x, Merge.func_type_id t) (yts, e1) env) env defs in
+      LetRec(xt, List.map (fun { name = xt; args = yts; body = e1 } ->
+                               { name = xt; args = yts; body = g env e1}) defs, g env e2)
+  | App(x, ys, n) when Vm.mem (x, n) env -> (* 関数適用の場合 (caml2html: inline_app) *)
+      let (zs, e) = Vm.find (x, n) env in
       Format.eprintf "inlining %s@." x;
       let env' =
         List.fold_left2
@@ -32,4 +32,4 @@ let rec g env = function (* インライン展開ルーチン本体 (caml2html: inline_g) *)
   | Match(x, e1, y, z, e2) -> Match(x, g env e1, y, z, g env e2)
   | e -> e
 
-let f e = g M.empty e
+let f e = g Vm.empty e
