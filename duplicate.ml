@@ -47,16 +47,17 @@ let rec g env e = match e with
         cnt := cvalue + 1;
         Var(x, cvalue)
       else Var(x, 0) (* 外部変数または関数とその引数 *)
-  | LetRec({ name = (x, [xt]); args = ytss; body = [e1] }, e2) ->
+  | LetRec((lx, [lxt]), [{ name = (x, t); args = yts; body = e1 }], e2) ->
       (* 関数とその引数はコピーしない *)
-      let benv = List.fold_left (fun env y -> M.remove y env) (M.remove x env) (List.map fst ytss) in
+      let benv = List.fold_left (fun env y -> M.remove y env) (M.remove x env) (List.map fst yts) in
       let cnt = ref 0 in
-      let e2' = g (M.add x cnt env) e2 in
-      LetRec({ name = (x, copy_type_n !cnt xt);
-               args = List.map (fun (y, [yt]) -> (y, copy_type_n !cnt yt)) ytss;
-               body = gn !cnt benv e1 },
+      let e2' = g (M.add lx cnt env) e2 in
+      LetRec((lx, copy_type_n !cnt lxt),
+             List.map (fun e1' -> { name = (x, copy_type t);
+                                    args = List.map (fun (y, t) -> (y, copy_type t)) yts;
+                                    body = e1' }) (gn !cnt benv e1),
               e2')
-  | App(e1, e2s) -> App(g env e1, List.map (g env) e2s)
+  | App(e1, e2s, t) -> App(g env e1, List.map (g env) e2s, copy_type t)
   | Tuple(es) -> Tuple(List.map (g env) es)
   | LetTuple(xtss, [e1], e2) ->
       let cnt = ref 0 in

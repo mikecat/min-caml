@@ -136,21 +136,17 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       (match M.find x !Typing.extenv with
       | Type.Array(_) as t -> ExtArray x, t
       | _ -> failwith (Printf.sprintf "external variable %s does not have an array type" x))
-  | Syntax.LetRec({ Syntax.name = (x, ts); Syntax.args = ytss; Syntax.body = e1s }, e2) ->
-      let argnames = List.map fst ytss in
-      let argkeys = List.map (fun x -> (fst x, 0)) ytss in
-      let argtypes = transpose (List.map snd ytss) in
-      let defs' = List.map2 (fun t (yts, e1) ->
+  | Syntax.LetRec((x, ts), defs, e2) ->
+      let defs' = List.map (fun { Syntax.name = (x, t); Syntax.args = yts; Syntax.body = e1 } ->
         let env = Vm.add (x, 0) t env in
-        let e1', _ = g (Vm.add_list2 argkeys yts env) e1 in
+        let e1', _ = g (Vm.add_list (List.map (fun (y, t) -> ((y, 0), t)) yts) env) e1 in
         if not (Tm.mem t !funcTypeMap)
           then (funcTypeMap := Tm.add t !funcTypeCnt !funcTypeMap; funcTypeCnt := !funcTypeCnt + 1);
-        { name = (x, t); args = zip argnames yts; body = e1' }
-      ) ts (zip argtypes e1s) in
+        { name = (x, t); args = yts; body = e1' }) defs in
       let env' = Vm.add_v x ts env in
       let e2', t2 = g env' e2 in
       LetRec(defs', e2'), t2
-  | Syntax.App(Syntax.Var(f, n), e2s) when not (Vm.mem (f, n) env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
+  | Syntax.App(Syntax.Var(f, n), e2s, _) when not (Vm.mem (f, n) env) -> (* 外部関数の呼び出し (caml2html: knormal_extfunapp) *)
       (match M.find f !Typing.extenv with
       | Type.Fun(_, t) ->
           let rec bind xs = function (* "xs" are identifiers for the arguments *)
@@ -160,7 +156,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
                   (fun x -> bind (xs @ [x]) e2s) in
           bind [] e2s (* left-to-right evaluation *)
       | _ -> assert false)
-  | Syntax.App(e1, e2s) ->
+  | Syntax.App(e1, e2s, _) ->
       (match g env e1 with
       | _, (Type.Fun(_, t) as ft) as g_e1 ->
           if not (Tm.mem ft !funcTypeMap)

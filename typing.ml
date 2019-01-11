@@ -38,12 +38,14 @@ let rec deref_term = function
   | FDiv(e1, e2) -> FDiv(deref_term e1, deref_term e2)
   | If(e1, e2, e3) -> If(deref_term e1, deref_term e2, deref_term e3)
   | Let(xt, e1, e2) -> Let(deref_id_typl xt, List.map deref_term e1, deref_term e2)
-  | LetRec({ name = xt; args = yts; body = e1s }, e2) ->
-      LetRec({ name = deref_id_typl xt;
-               args = List.map deref_id_typl yts;
-               body = List.map deref_term e1s },
+  | LetRec(xt, defs, e2) ->
+      LetRec(deref_id_typl xt,
+             List.map (fun { name = xt; args = yts; body = e1 } ->
+                           { name = deref_id_typ xt;
+                             args = List.map deref_id_typ yts;
+                             body = deref_term e1 }) defs,
              deref_term e2)
-  | App(e, es) -> App(deref_term e, List.map deref_term es)
+  | App(e, es, t) -> App(deref_term e, List.map deref_term es, deref_typ t)
   | Tuple(es) -> Tuple(List.map deref_term es)
   | LetTuple(xts, e1, e2) -> LetTuple(List.map deref_id_typl xts, List.map deref_term e1, deref_term e2)
   | Array(e1, e2) -> Array(deref_term e1, deref_term e2)
@@ -134,17 +136,16 @@ let rec g env e = (* ·¿¿äÏÀ¥ë¡¼¥Á¥ó (caml2html: typing_g) *)
         let t = Type.gentyp () in
         extenv := M.add x t !extenv;
         t
-    | LetRec({ name = (x, ts); args = ytss; body = e1s }, e2) -> (* let rec¤Î·¿¿äÏÀ (caml2html: typing_letrec) *)
-        let argkeys = List.map (fun x -> (fst x, 0)) ytss in
-        let argtypes = transpose (List.map snd ytss) in
-        List.iter2 (fun t (yts, e1) ->
+    | LetRec((x, ts), defs, e2) -> (* let rec¤Î·¿¿äÏÀ (caml2html: typing_letrec) *)
+        List.iter2 (fun lt { name = (x, t); args = yts; body = e1 } ->
           let env = Vm.add (x, 0) t env in
-          unify t (Type.Fun(yts, g (Vm.add_list2 argkeys yts env) e1))
-        ) ts (zip argtypes e1s);
+          unify t (Type.Fun(List.map snd yts, g (Vm.add_list (List.map (fun (y, t) -> ((y, 0), t)) yts) env) e1));
+          unify lt t) ts defs;
         g (Vm.add_v x ts env) e2
-    | App(e, es) -> (* ´Ø¿ôÅ¬ÍÑ¤Î·¿¿äÏÀ (caml2html: typing_app) *)
+    | App(e, es, ft) -> (* ´Ø¿ôÅ¬ÍÑ¤Î·¿¿äÏÀ (caml2html: typing_app) *)
         let t = Type.gentyp () in
-        unify (g env e) (Type.Fun(List.map (g env) es, t));
+        unify ft (Type.Fun(List.map (g env) es, t));
+        unify (g env e) ft;
         t
     | Tuple(es) -> Type.Tuple(List.map (g env) es)
     | LetTuple(xtss, e1s, e2) ->

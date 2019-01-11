@@ -137,10 +137,11 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
     { Let(addtypl $2, [$4], $6) }
 | LET REC fundef IN exp
     %prec prec_let
-    { LetRec($3, $5) }
+    { let fd = $3 in
+      LetRec((fst fd.name, [snd fd.name]), [fd], $5) }
 | simple_exp actual_args
     %prec prec_app
-    { App($1, $2) }
+    { App($1, $2, Type.gentyp ()) }
 | elems
     %prec prec_tuple
     { Tuple($1) }
@@ -166,13 +167,13 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 
 fundef:
 | IDENT formal_args EQUAL exp
-    { { name = addtypl $1; args = $2; body = [$4] } }
+    { { name = addtyp $1; args = $2; body = $4 } }
 
 formal_args:
 | IDENT formal_args
-    { addtypl $1 :: $2 }
+    { addtyp $1 :: $2 }
 | IDENT
-    { [addtypl $1] }
+    { [addtyp $1] }
 
 actual_args:
 | actual_args simple_exp
