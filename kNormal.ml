@@ -151,7 +151,7 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) *)
       (match aft with
       | Type.Fun(_, afr) ->
         (match g env e1 with
-        | _, (Type.Fun(_, _) as ft) as g_e1 ->
+        | _, (Type.Fun(_, _)) as g_e1 ->
             insert_let g_e1
               (fun f ->
                 let rec bind xs = function (* "xs" are identifiers for the arguments *)
