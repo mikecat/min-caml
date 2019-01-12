@@ -94,9 +94,6 @@ let rec g e = match e with
                            { name = xt; args = yts; body = g e1 }) defs,
              g e2)
   | App(e1, e2s, t) ->
-      if not (Tm.mem t !func_type_map)
-        then (func_type_map := Tm.add t !func_type_cnt !func_type_map;
-              func_type_cnt := !func_type_cnt + 1);
       App(g e1, List.map g e2s, t)
   | Tuple(e1s) -> Tuple(List.map g e1s)
   | LetTuple(xtss, e1s, e2) ->
