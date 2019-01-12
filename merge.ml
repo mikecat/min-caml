@@ -11,6 +11,11 @@ let func_type_cnt = ref 0
 let func_type_map = ref Tm.empty
 let func_type_id t = Tm.find t !func_type_map
 
+let register_func_types =
+  List.iter (fun t -> if not (Tm.mem t !func_type_map)
+                      then (func_type_map := Tm.add t !func_type_cnt !func_type_map;
+                            func_type_cnt := !func_type_cnt + 1))
+
 let foldl1 f l = List.fold_left f (List.hd l) (List.tl l)
 
 let rec merge_type t1 t2 = match t1, t2 with
@@ -43,16 +48,9 @@ let rec merge_ast a1 a2 = match a1, a2 with
       Let((x1, List.map2 merge_type t1s t2s), List.map2 merge_ast e11s e21s, merge_ast e12 e22)
   | Var(x1, _), Var(x2, _) when x1 = x2 -> Var(x1, 0)
   | LetRec((x1, t1s), def1s, e1), LetRec((x2, t2s), def2s, e2) when x1 = x2 ->
-      LetRec((x1, List.map2 merge_type t1s t2s),
-             List.map2
-               (fun { name = (x1, t1); args = yts1; body = e1 }
-                    { name = (x2, t2); args = yts2; body = e2 } ->
-                assert (x1 = x2);
-                { name = (x1, merge_type t1 t2);
-                  args = List.map2 (fun (y1, ty1) (y2, ty2) -> assert (y1 = y2);
-                                                               (y1, merge_type ty1 ty2)) yts1 yts2;
-                  body = merge_ast e1 e2 }) def1s def2s,
-             merge_ast e1 e2)
+      register_func_types t1s;
+      register_func_types t2s;
+      LetRec((x1, List.map2 merge_type t1s t2s), def1s @ def2s, merge_ast e1 e2)
   | App(e11, e12s, t1), App(e21, e22s, t2) when t1 = t2 ->
       App(merge_ast e11 e21, List.map2 merge_ast e12s e22s, merge_type t1 t2)
   | Tuple(e1s), Tuple(e2s) -> Tuple(List.map2 merge_ast e1s e2s)
@@ -94,10 +92,7 @@ let rec g e = match e with
   | Let((x, xts), e1s, e2) -> Let((x, [merge_types xts]), [merge_asts e1s], g e2)
   | Var(x, n) -> Var(x, 0)
   | LetRec((x, xts), defs, e2) ->
-      List.iter (fun t ->
-                 if not (Tm.mem t !func_type_map)
-                 then (func_type_map := Tm.add t !func_type_cnt !func_type_map;
-                       func_type_cnt := !func_type_cnt + 1)) xts;
+      register_func_types xts;
       LetRec((x, [merge_types xts]),
              List.map (fun { name = xt; args = yts; body = e1 } ->
                            { name = xt; args = yts; body = g e1 }) defs,
