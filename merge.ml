@@ -53,6 +53,7 @@ let rec merge_ast a1 a2 = match a1, a2 with
       LetRec((x1, List.map2 merge_type t1s t2s), def1s @ def2s, merge_ast e1 e2)
   | App(e11, e12s, t1), App(e21, e22s, t2) when t1 = t2 ->
       App(merge_ast e11 e21, List.map2 merge_ast e12s e22s, merge_type t1 t2)
+  | App(_, _, _), App(_, _, _) -> failwith "tried to merge function applications having different types"
   | Tuple(e1s), Tuple(e2s) -> Tuple(List.map2 merge_ast e1s e2s)
   | LetTuple(xts1s, e11s, e12), LetTuple(xts2s, e21s, e22) ->
       LetTuple(List.map2 (fun (x, txs) (y, tys) -> assert (x = y);
