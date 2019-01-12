@@ -3,6 +3,7 @@
 open Asm
 
 let data = ref [] (* 浮動小数点数の定数テーブル (caml2html: virtual_data) *)
+let closure_funcs = ref [] (* クロージャー経由で呼ばれる関数のリスト *)
 
 let classify xts ini addf addi =
   List.fold_left
@@ -74,6 +75,8 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
       | Type.Float -> Ans(FMovD(x))
       | _ -> Ans(Mov(x)))
   | Closure.MakeCls((x, t), { Closure.entry = l; Closure.actual_fv = ys }, e2) -> (* クロージャの生成 (caml2html: virtual_makecls) *)
+      (* Closureで使われる関数を記録 *)
+      if not (List.mem l !closure_funcs) then closure_funcs := l :: !closure_funcs;
       (* Closureのアドレスをセットしてから、自由変数の値をストア *)
       let e2' = g (M.add x t env) e2 in
       let offset, store_fv =
@@ -88,9 +91,9 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
               Let((z, Type.Int), SetL(l),
                   seq(St(z, x, C(0), 1),
                       store_fv))))
-  | Closure.AppCls(x, ys) ->
+  | Closure.AppCls(x, ys, n) ->
       let (int, float) = separate (List.map (fun y -> (y, M.find y env)) ys) in
-      Ans(CallCls(x, int, float))
+      Ans(CallCls(x, n, int, float))
   | Closure.AppDir(Id.L(x), ys) ->
       let (int, float) = separate (List.map (fun y -> (y, M.find y env)) ys) in
       Ans(CallDir(Id.L(x), int, float))
@@ -174,6 +177,7 @@ let h { Closure.name = (Id.L(x), t); Closure.args = yts; Closure.formal_fv = zts
 (* プログラム全体の仮想マシンコード生成 (caml2html: virtual_f) *)
 let f (Closure.Prog(fundefs, e)) =
   data := [];
+  closure_funcs := [];
   let fundefs = List.map h fundefs in
   let e = g M.empty e in
-  Prog(!data, fundefs, e)
+  Prog(!data, !closure_funcs, fundefs, e)

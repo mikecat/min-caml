@@ -16,7 +16,7 @@ let rec target' src (dest, t) = function
       let c1, rs1 = target src (dest, t) e1 in
       let c2, rs2 = target src (dest, t) e2 in
       c1 && c2, rs1 @ rs2
-  | CallCls(x, ys, zs) ->
+  | CallCls(x, _, ys, zs) ->
       true, (target_args src regs 0 ys @
              target_args src fregs 0 zs @
              if x = src then [reg_cl] else [])
@@ -152,11 +152,11 @@ and g' dest cont regenv = function (* 各命令のレジスタ割り当て (caml2html: regal
   | IfGE(x, y', e1, e2) as exp -> g'_if dest cont regenv exp (fun e1' e2' -> IfGE(find x Type.Int regenv, find' y' regenv, e1', e2')) e1 e2
   | IfFEq(x, y, e1, e2) as exp -> g'_if dest cont regenv exp (fun e1' e2' -> IfFEq(find x Type.Float regenv, find y Type.Float regenv, e1', e2')) e1 e2
   | IfFLE(x, y, e1, e2) as exp -> g'_if dest cont regenv exp (fun e1' e2' -> IfFLE(find x Type.Float regenv, find y Type.Float regenv, e1', e2')) e1 e2
-  | CallCls(x, ys, zs) as exp ->
+  | CallCls(x, n, ys, zs) as exp ->
       if List.length ys > Array.length regs - 1 || List.length zs > Array.length fregs then
         failwith (Format.sprintf "cannot allocate registers for arugments to %s" x)
       else
-        g'_call dest cont regenv exp (fun ys zs -> CallCls(find x Type.Int regenv, ys, zs)) ys zs
+        g'_call dest cont regenv exp (fun ys zs -> CallCls(find x Type.Int regenv, n, ys, zs)) ys zs
   | CallDir(Id.L(x), ys, zs) as exp ->
       if List.length ys > Array.length regs || List.length zs > Array.length fregs then
         failwith (Format.sprintf "cannot allocate registers for arugments to %s" x)
@@ -226,8 +226,8 @@ let h { name = Id.L(x); args = ys; fargs = zs; body = e; ret = t } = (* 関数のレ
   let (e', regenv') = g (a, t) (Ans(Mov(a))) regenv e in
   { name = Id.L(x); args = arg_regs; fargs = farg_regs; body = e'; ret = t }
 
-let f (Prog(data, fundefs, e)) = (* プログラム全体のレジスタ割り当て (caml2html: regalloc_f) *)
+let f (Prog(data, clfuncs, fundefs, e)) = (* プログラム全体のレジスタ割り当て (caml2html: regalloc_f) *)
   Format.eprintf "register allocation: may take some time (up to a few minutes, depending on the size of functions)@.";
   let fundefs' = List.map h fundefs in
   let e', regenv' = g (Id.gentmp Type.Unit, Type.Unit) (Ans(Nop)) M.empty e in
-  Prog(data, fundefs', e')
+  Prog(data, clfuncs, fundefs', e')

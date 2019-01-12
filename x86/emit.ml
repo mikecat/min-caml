@@ -177,17 +177,29 @@ and g' oc = function (* 各命令のアセンブリ生成 (caml2html: emit_gprime) *)
       Printf.fprintf oc "\tcomisd\t%s, %s\n" y x;
       g'_non_tail_if oc (NonTail(z)) e1 e2 "jbe" "ja"
   (* 関数呼び出しの仮想命令の実装 (caml2html: emit_call) *)
-  | Tail, CallCls(x, ys, zs) -> (* 末尾呼び出し (caml2html: emit_tailcall) *)
+  | Tail, CallCls(x, n, ys, zs) -> (* 末尾呼び出し (caml2html: emit_tailcall) *)
       g'_args oc [(x, reg_cl)] ys zs;
-      Printf.fprintf oc "\tjmp\t*(%s)\n" reg_cl;
+      Printf.fprintf oc "\tpushl\t%s\n" reg_cl;
+      Printf.fprintf oc "\tmovl\t(%s), %s\n" reg_cl reg_cl;
+      Printf.fprintf oc "\tmovl\t%d(%s), %s\n" (n * 4) reg_cl reg_cl;
+      Printf.fprintf oc "\txchgl\t%s, (%%esp)\n" reg_cl;
+      Printf.fprintf oc "\tret\n";
   | Tail, CallDir(Id.L(x), ys, zs) -> (* 末尾呼び出し *)
       g'_args oc [] ys zs;
       Printf.fprintf oc "\tjmp\t%s\n" x;
-  | NonTail(a), CallCls(x, ys, zs) ->
+  | NonTail(a), CallCls(x, n, ys, zs) ->
       g'_args oc [(x, reg_cl)] ys zs;
       let ss = stacksize () in
       if ss > 0 then Printf.fprintf oc "\taddl\t$%d, %s\n" ss reg_sp;
-      Printf.fprintf oc "\tcall\t*(%s)\n" reg_cl;
+      Printf.fprintf oc "\tjmp\t1f\n";
+      Printf.fprintf oc "2:\n";
+      Printf.fprintf oc "\tpushl\t%s\n" reg_cl;
+      Printf.fprintf oc "\tmovl\t(%s), %s\n" reg_cl reg_cl;
+      Printf.fprintf oc "\tmovl\t%d(%s), %s\n" (n * 4) reg_cl reg_cl;
+      Printf.fprintf oc "\txchgl\t%s, (%%esp)\n" reg_cl;
+      Printf.fprintf oc "\tret\n";
+      Printf.fprintf oc "1:\n";
+      Printf.fprintf oc "\tcall\t2b\n";
       if ss > 0 then Printf.fprintf oc "\tsubl\t$%d, %s\n" ss reg_sp;
       if List.mem a allregs && a <> regs.(0) then
         Printf.fprintf oc "\tmovl\t%s, %s\n" regs.(0) a
@@ -252,7 +264,7 @@ let h oc { name = Id.L(x); args = _; fargs = _; body = e; ret = _ } =
   stackmap := [];
   g oc (Tail, e)
 
-let f oc (Prog(data, fundefs, e)) =
+let f oc (Prog(data, clfuncs, fundefs, e)) =
   Format.eprintf "generating assembly...@.";
   Printf.fprintf oc ".data\n";
   Printf.fprintf oc ".balign\t8\n";
@@ -262,6 +274,16 @@ let f oc (Prog(data, fundefs, e)) =
       Printf.fprintf oc "\t.long\t0x%lx\n" (gethi d);
       Printf.fprintf oc "\t.long\t0x%lx\n" (getlo d))
     data;
+  List.iter
+    (fun (Id.L(fname)) ->
+      Printf.fprintf oc "%s:\n" fname;
+      let rec gen_table cnt =
+        let l = Printf.sprintf "T%d_%s" cnt fname in
+        let exists = List.exists (fun { name = Id.L(fn) } -> fn = l) fundefs in
+        Printf.fprintf oc "\t.long\t%s\n" (if exists then l else "0");
+        if cnt < !Merge.func_type_cnt then gen_table (cnt + 1)
+      in gen_table 0)
+    clfuncs;
   Printf.fprintf oc ".text\n";
   List.iter (fun fundef -> h oc fundef) fundefs;
   Printf.fprintf oc ".globl\tmin_caml_start\n";
