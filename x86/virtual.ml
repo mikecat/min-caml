@@ -162,13 +162,18 @@ let rec g env = function (* 式の仮想マシンコード生成 (caml2html: virtual_g) *)
 
 (* 関数の仮想マシンコード生成 (caml2html: virtual_h) *)
 let h { Closure.name = (Id.L(x), t); Closure.args = yts; Closure.formal_fv = zts; Closure.body = e } =
+  let basename = if x.[0] = 'T'
+                 then let len = String.length x in
+                      let idx = String.index x '_' in
+                                String.sub x (idx + 1) (len - idx - 1)
+                 else x in
   let (int, float) = separate yts in
   let (offset, load) =
     expand
       zts
-      (4, g (M.add x t (M.add_list yts (M.add_list zts M.empty))) e)
-      (fun z offset load -> fletd(z, LdDF(x, C(offset), 1), load))
-      (fun z t offset load -> Let((z, t), Ld(x, C(offset), 1), load)) in
+      (4, g (M.add basename t (M.add_list yts (M.add_list zts M.empty))) e)
+      (fun z offset load -> fletd(z, LdDF(basename, C(offset), 1), load))
+      (fun z t offset load -> Let((z, t), Ld(basename, C(offset), 1), load)) in
   match t with
   | Type.Fun(_, t2) ->
       { name = Id.L(x); args = int; fargs = float; body = load; ret = t2 }

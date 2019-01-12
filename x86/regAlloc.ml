@@ -197,7 +197,12 @@ and g'_call dest cont regenv exp constr ys zs = (* ´Ø¿ô¸Æ¤Ó½Ð¤·¤Î¥ì¥¸¥¹¥¿³ä¤êÅö¤
    M.empty)
 
 let h { name = Id.L(x); args = ys; fargs = zs; body = e; ret = t } = (* ´Ø¿ô¤Î¥ì¥¸¥¹¥¿³ä¤êÅö¤Æ (caml2html: regalloc_h) *)
-  let regenv = M.add x reg_cl M.empty in
+  let basename = if x.[0] = 'T'
+                 then let len = String.length x in
+                      let idx = String.index x '_' in
+                                String.sub x (idx + 1) (len - idx - 1)
+                 else x in
+  let regenv = M.add basename reg_cl M.empty in
   let (i, arg_regs, regenv) =
     List.fold_left
       (fun (i, arg_regs, regenv) y ->
