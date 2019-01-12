@@ -95,7 +95,9 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure
       List.iter (fun { KNormal.name = (x, t); KNormal.args = yts; KNormal.body = e1 } ->
         let env' = M.add x t env in
         let e1' = g (M.add_list yts env') known' e1 in
-        toplevel := { name = (Id.L(x), t); args = yts; formal_fv = zts; body = e1' } :: !toplevel (* トップレベル関数を追加 *)
+        let tid = Merge.func_type_id t in
+        let l = Printf.sprintf "T%d_%s" tid x in
+        toplevel := { name = (Id.L(l), t); args = yts; formal_fv = zts; body = e1' } :: !toplevel (* トップレベル関数を追加 *)
       ) defs;
       (* 各定義をマージした情報を用いて、その後の処理をさせる *)
       let env' = M.add mx mt env in
@@ -105,9 +107,9 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure
       else
         (Format.eprintf "eliminating closure(s) %s@." x;
          e2') (* 出現しなければMakeClsを削除 *)
-  | KNormal.App(x, ys, _) when S.mem x known -> (* 関数適用の場合 (caml2html: closure_app) *)
+  | KNormal.App(x, ys, n) when S.mem x known -> (* 関数適用の場合 (caml2html: closure_app) *)
       Format.eprintf "directly applying %s@." x;
-      AppDir(Id.L(x), ys)
+      AppDir(Id.L(Printf.sprintf "T%d_%s" n x), ys)
   | KNormal.App(f, xs, _) -> AppCls(f, xs)
   | KNormal.Tuple(xs) -> Tuple(xs)
   | KNormal.LetTuple(xts, y, e) -> LetTuple(xts, y, g (M.add_list xts env) known e)
