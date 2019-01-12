@@ -43,7 +43,16 @@ let rec merge_ast a1 a2 = match a1, a2 with
       Let((x1, List.map2 merge_type t1s t2s), List.map2 merge_ast e11s e21s, merge_ast e12 e22)
   | Var(x1, _), Var(x2, _) when x1 = x2 -> Var(x1, 0)
   | LetRec((x1, t1s), def1s, e1), LetRec((x2, t2s), def2s, e2) when x1 = x2 ->
-      LetRec((x1, t1s @ t2s), def1s @ def2s, merge_ast e1 e2)
+      LetRec((x1, List.map2 merge_type t1s t2s),
+             List.map2
+               (fun { name = (x1, t1); args = yts1; body = e1 }
+                    { name = (x2, t2); args = yts2; body = e2 } ->
+                assert (x1 = x2);
+                { name = (x1, merge_type t1 t2);
+                  args = List.map2 (fun (y1, ty1) (y2, ty2) -> assert (y1 = y2);
+                                                               (y1, merge_type ty1 ty2)) yts1 yts2;
+                  body = merge_ast e1 e2 }) def1s def2s,
+             merge_ast e1 e2)
   | App(e11, e12s, t1), App(e21, e22s, t2) when t1 = t2 ->
       App(merge_ast e11 e21, List.map2 merge_ast e12s e22s, merge_type t1 t2)
   | Tuple(e1s), Tuple(e2s) -> Tuple(List.map2 merge_ast e1s e2s)
