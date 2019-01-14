@@ -36,7 +36,7 @@ join-reg join-reg2 non-tail-if non-tail-if2 \
 inprod inprod-rec inprod-loop matmul matmul-flat \
 manyargs list-reverse prime list-transpose list-float list-unit \
 list-fold list-multi list-transpose-nocopy multi-let let-emptylist \
-multi-in-let
+multi-in-let list-map
 
 do_test: $(TESTS:%=test/%.cmp)
 

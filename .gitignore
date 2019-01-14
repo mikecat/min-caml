@@ -49,6 +49,7 @@
 /test/let-emptylist
 /test/list-float
 /test/list-fold
+/test/list-map
 /test/list-multi
 /test/list-reverse
 /test/list-transpose
